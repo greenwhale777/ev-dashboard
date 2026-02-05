@@ -312,7 +312,7 @@ export default function Dashboard() {
                           </div>
                           {bot.hasManualRun && (
                             <button
-                              onClick={() => bot.link ? window.location.href = bot.link : null}
+                              onClick={() => 'link' in bot && bot.link ? window.location.href = bot.link : null}
                               className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95"
                             >
                               ▶️ 수동 실행
