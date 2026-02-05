@@ -193,7 +193,7 @@ export default function Dashboard() {
               >
                 <span>{config.icon}</span>
                 <span>{config.title.split(' - ')[0]}</span>
-                {config.comingSoon && (
+                {'comingSoon' in config && config.comingSoon && (
                   <span className="text-xs bg-white/30 px-2 py-0.5 rounded">개발 중</span>
                 )}
               </button>
