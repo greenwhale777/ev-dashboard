@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 
 // API 서버 URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ev0-agent-production.up.railway.app';
+const API_URL = process.env.NEXT_PUBLIC_EV0_API_URL || 'https://ev0-agent-production.up.railway.app';
 
 // 로그 타입
 interface ExecutionLog {
@@ -107,12 +107,12 @@ export default function Dashboard() {
       if (!logsRes.ok) throw new Error('로그 조회 실패');
       const logsData = await logsRes.json();
       setLogs(logsData);
-      
+
       const statusRes = await fetch(`${API_URL}/api/status`);
       if (!statusRes.ok) throw new Error('상태 조회 실패');
       const statusData = await statusRes.json();
       setBotStatus(statusData);
-      
+
       setLastUpdate(new Date());
       setLoading(false);
     } catch (e) {
@@ -136,7 +136,7 @@ export default function Dashboard() {
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
         * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
       `}</style>
-      
+
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         {/* 헤더 */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
@@ -157,7 +157,7 @@ export default function Dashboard() {
                     마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR')}
                   </span>
                 )}
-                <button 
+                <button
                   onClick={fetchLogs}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-all cursor-pointer active:scale-95"
                 >
@@ -297,7 +297,7 @@ export default function Dashboard() {
                             {badge.label}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <div className="text-sm">
                             <span className="text-slate-400">마지막 실행:</span>
@@ -309,7 +309,7 @@ export default function Dashboard() {
                             </button>
                           )}
                         </div>
-                        
+
                         {status?.message && (
                           <div className="mt-3 p-3 bg-slate-100 rounded-lg">
                             <p className="text-xs text-slate-600">{status.message}</p>
@@ -367,7 +367,7 @@ export default function Dashboard() {
                             {badge.label}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <div className="text-sm">
                             <span className="text-slate-400">마지막 실행:</span>
@@ -379,7 +379,7 @@ export default function Dashboard() {
                             </button>
                           )}
                         </div>
-                        
+
                         {status?.message && (
                           <div className="mt-3 p-3 bg-slate-100 rounded-lg">
                             <p className="text-xs text-slate-600">{status.message}</p>
