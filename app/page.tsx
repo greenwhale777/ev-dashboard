@@ -48,6 +48,13 @@ const botConfigs = {
         schedule: '매주 월요일 09:00',
         hasManualRun: true,
         command: '/run 올리브영'
+      },
+      {
+        id: 'page-analyzer',
+        name: '상세페이지 분석',
+        schedule: '수동 실행',
+        hasManualRun: true,
+        link: '/ev2'
       }
     ]
   },
@@ -304,7 +311,10 @@ export default function Dashboard() {
                             <span className="text-slate-700 font-medium ml-2">{formatTime(status?.endTime)}</span>
                           </div>
                           {bot.hasManualRun && (
-                            <button className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95">
+                            <button
+                              onClick={() => bot.link ? window.location.href = bot.link : null}
+                              className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95"
+                            >
                               ▶️ 수동 실행
                             </button>
                           )}
