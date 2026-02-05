@@ -27,6 +27,35 @@ export interface KeyIngredient {
   benefits: string[];
 }
 
+export interface ImageAnalysis {
+  imageNumber: number;
+  topic: string;
+  keySummary: string[];
+  copywriting: {
+    headline?: string;
+    subCopy?: string;
+    bodyText?: string;
+    emphasisPhrases?: string[];
+    claimStatements?: string[];
+    cta?: string;
+  };
+  dataElements: {
+    statistics?: string[];
+    certifications?: string[];
+    testResults?: string;
+    comparisons?: string;
+    percentages?: string;
+    beforeAfter?: string;
+  };
+  visualElements: {
+    layout?: string;
+    background?: string;
+    colorScheme?: string;
+    icons?: string[];
+    modelUsage?: string;
+  };
+}
+
 export interface AnalysisData {
   productName: string;
   brand: string;
@@ -45,6 +74,7 @@ export interface AnalysisData {
   competitiveAdvantage: string;
   suggestions: string[];
   summary: string;
+  imageAnalysis?: ImageAnalysis[];
 }
 
 export interface AnalysisResult {
