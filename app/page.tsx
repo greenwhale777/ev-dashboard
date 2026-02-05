@@ -2,20 +2,77 @@
 
 import { useState, useEffect } from 'react';
 
-// API 서버 URL - Railway 배포 후 자동 전환
+// API 서버 URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ev0-agent-production.up.railway.app';
 
-// 봇 설정
-const instantBots = [
-  { id: 'oliveyoung', name: '올리브영 스크래퍼', command: '/run 올리브영' },
-  { id: 'cash-bot', name: '캐시 잔액 확인', command: '/run 캐시' },
-];
+// 로그 타입
+interface ExecutionLog {
+  botId: string;
+  botName: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  message: string;
+  result?: {
+    match?: boolean;
+    clobeBalance?: number;
+    ecountBalance?: number;
+    difference?: number;
+  };
+}
 
-const scheduledBots = [
-  { id: 'oliveyoung', name: '올리브영 스크래퍼', schedule: '매주 월요일 09:00' },
-  { id: 'accounting', name: '회계전표 업로드', schedule: '매주 수요일 12:00' },
-  { id: 'cash-bot', name: '캐시 잔액 확인', schedule: '매일 08:00' },
-];
+// 봇 설정
+const botConfigs = {
+  ev0: {
+    title: 'EV0 - 중앙 관리',
+    icon: '🎯',
+    color: '#1E9EDE',
+    bots: []
+  },
+  ev1: {
+    title: 'EV1 - 재고 관리',
+    icon: '📦',
+    color: '#10B981',
+    bots: [],
+    comingSoon: true
+  },
+  ev2: {
+    title: 'EV2 - 생산성 봇',
+    icon: '🔍',
+    color: '#3B82F6',
+    bots: [
+      {
+        id: 'oliveyoung',
+        name: '올리브영 스크래퍼',
+        schedule: '매주 월요일 09:00',
+        hasManualRun: true,
+        command: '/run 올리브영'
+      }
+    ]
+  },
+  ev3: {
+    title: 'EV3 - 백오피스',
+    icon: '💼',
+    color: '#8B5CF6',
+    bots: [
+      {
+        id: 'accounting',
+        name: '회계전표 업로드',
+        schedule: '매주 수요일 12:00',
+        hasManualRun: true,
+        command: '/run 회계'
+      },
+      {
+        id: 'cash-bot',
+        name: '캐시 잔액 확인',
+        schedule: '매일 08:00',
+        hasManualRun: true,
+        command: '/run 캐시'
+      }
+    ]
+  }
+};
 
 // 상태 뱃지
 function getStatusBadge(status: string | undefined) {
@@ -35,29 +92,8 @@ function formatTime(isoString: string | undefined) {
   return `${month}/${day} ${hours}:${minutes}`;
 }
 
-// 로그 타입
-interface ExecutionLog {
-  botId: string;
-  botName: string;
-  status: string;
-  startTime: string;
-  endTime: string;
-  duration: string;
-  message: string;
-  result?: {
-    match?: boolean;
-    clobeBalance?: number;
-    ecountBalance?: number;
-    difference?: number;
-  };
-  error?: {
-    type: string;
-    message: string;
-  };
-}
-
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'instant' | 'scheduled'>('scheduled');
+  const [activeTab, setActiveTab] = useState<'ev0' | 'ev1' | 'ev2' | 'ev3'>('ev2');
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
   const [botStatus, setBotStatus] = useState<Record<string, ExecutionLog>>({});
   const [loading, setLoading] = useState(true);
@@ -92,6 +128,8 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const currentConfig = botConfigs[activeTab];
+
   return (
     <>
       <style jsx global>{`
@@ -102,7 +140,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         {/* 헤더 */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center">
@@ -110,7 +148,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">EV System Dashboard</h1>
-                  <p className="text-sm text-slate-500">ASCENDERZ Automation</p>
+                  <p className="text-sm text-slate-500">ASCENDERZ Elevator Framework</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -130,7 +168,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <main className="max-w-6xl mx-auto px-6 pt-20 pb-8">
+        <main className="max-w-7xl mx-auto px-6 pt-6 pb-8">
           {apiError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-2 text-red-600">
@@ -140,149 +178,265 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* 탭 메뉴 - 두 개 모두 항상 표시 */}
-          <div className="flex gap-6 mt-8 mb-8">
-            <button
-              onClick={() => setActiveTab('instant')}
-              style={{
-                backgroundColor: activeTab === 'instant' ? '#0F172A' : '#CBD5E1',
-                color: activeTab === 'instant' ? '#FFFFFF' : '#334155',
-              }}
-              className="px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 cursor-pointer hover:opacity-80 active:scale-95"
-            >
-              ⚡ 바로 실행
-            </button>
-            <button
-              onClick={() => setActiveTab('scheduled')}
-              style={{
-                backgroundColor: activeTab === 'scheduled' ? '#0F172A' : '#CBD5E1',
-                color: activeTab === 'scheduled' ? '#FFFFFF' : '#334155',
-              }}
-              className="px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 cursor-pointer hover:opacity-80 active:scale-95"
-            >
-              📅 정기 모니터링
-            </button>
+          {/* EV 모듈 탭 */}
+          <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
+            {Object.entries(botConfigs).map(([key, config]) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key as any)}
+                style={{
+                  backgroundColor: activeTab === key ? config.color : '#E2E8F0',
+                  color: activeTab === key ? '#FFFFFF' : '#475569',
+                  borderColor: activeTab === key ? config.color : 'transparent',
+                }}
+                className="px-5 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-95 border-2 whitespace-nowrap flex items-center gap-2"
+              >
+                <span>{config.icon}</span>
+                <span>{config.title.split(' - ')[0]}</span>
+                {config.comingSoon && (
+                  <span className="text-xs bg-white/30 px-2 py-0.5 rounded">개발 중</span>
+                )}
+              </button>
+            ))}
           </div>
 
-          {/* 바로 실행 탭 */}
-          {activeTab === 'instant' && (
+          {/* EV0 - 중앙 관리 */}
+          {activeTab === 'ev0' && (
             <div className="space-y-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">⚡ 바로 실행</h3>
-                <p className="text-sm text-slate-500 mb-4">텔레그램에서 명령어로 실행하세요</p>
-                <div className="space-y-3">
-                  {instantBots.map((bot) => {
-                    const status = botStatus[bot.id];
-                    const badge = getStatusBadge(status?.status);
-                    return (
-                      <div key={bot.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-slate-100 transition-all duration-200 cursor-pointer">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-slate-900">{bot.name}</div>
-                            <div className="text-sm text-slate-500 mt-1">
-                              명령어: <code className="bg-slate-200 px-2 py-0.5 rounded font-medium">{bot.command}</code>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className={`text-xs font-semibold px-2 py-1 rounded ${badge.bg} ${badge.text}`}>
-                              {badge.label}
-                            </span>
-                            {status && (
-                              <div className="text-xs text-slate-400 mt-1">{formatTime(status.endTime)}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">📋 실행 로그</h3>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {loading ? (
-                    <div className="text-center py-8 text-slate-400">로딩 중...</div>
-                  ) : logs.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">실행 로그가 없습니다</div>
-                  ) : (
-                    logs.filter(log => log.botId === 'oliveyoung' || log.botId === 'cash-bot').slice(0, 10).map((log, i) => (
-                      <div key={i} className="flex items-center gap-3 text-sm py-2 border-b border-slate-100 last:border-0">
-                        <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                          {log.status === 'SUCCESS' ? '성공' : '실패'}
-                        </span>
-                        <span className="text-[#1E9EDE] font-semibold">[{log.botName}]</span>
-                        <span className="text-slate-700 truncate">{log.message}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 정기 모니터링 탭 */}
-          {activeTab === 'scheduled' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">📅 정기 실행 봇</h3>
-                <div className="space-y-3">
-                  {scheduledBots.map((bot) => {
-                    const status = botStatus[bot.id];
-                    const badge = getStatusBadge(status?.status);
-                    return (
-                      <div key={bot.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-slate-100 transition-all duration-200 cursor-pointer">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="font-semibold text-slate-900">{bot.name}</div>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${badge.bg} ${badge.text}`}>
-                            {badge.label}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="text-slate-500"><span className="text-slate-400">스케줄:</span> {bot.schedule}</div>
-                          <div className="text-slate-500"><span className="text-slate-400">마지막:</span> {formatTime(status?.endTime)}</div>
-                        </div>
-                        {status?.message && <div className="text-xs text-slate-500 mt-2 truncate">{status.message}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">📋 실행 로그</h3>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {loading ? (
-                    <div className="text-center py-8 text-slate-400">로딩 중...</div>
-                  ) : logs.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">실행 로그가 없습니다</div>
-                  ) : (
-                    logs.slice(0, 20).map((log, i) => (
-                      <div key={i} className="flex items-center gap-3 text-sm py-2 border-b border-slate-100 last:border-0">
-                        <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                          {log.status === 'SUCCESS' ? '성공' : '실패'}
-                        </span>
-                        <span className="text-[#1E9EDE] font-semibold">[{log.botName}]</span>
-                        <span className="text-slate-700 truncate">{log.message}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-slate-400">ℹ️</span>
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-3xl">{currentConfig.icon}</span>
                   <div>
-                    <div className="font-semibold text-slate-700">API 서버</div>
-                    <p className="text-sm text-slate-500 mt-1 font-mono">{API_URL}</p>
+                    <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
+                    <p className="text-sm text-slate-500">시스템 상태 및 통합 로그</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+                    <div className="text-sm text-blue-600 font-medium">전체 실행</div>
+                    <div className="text-2xl font-bold text-blue-900 mt-1">{logs.length}</div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl">
+                    <div className="text-sm text-emerald-600 font-medium">성공</div>
+                    <div className="text-2xl font-bold text-emerald-900 mt-1">
+                      {logs.filter(l => l.status === 'SUCCESS').length}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl">
+                    <div className="text-sm text-red-600 font-medium">실패</div>
+                    <div className="text-2xl font-bold text-red-900 mt-1">
+                      {logs.filter(l => l.status === 'ERROR').length}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-4">📋 전체 실행 로그</h3>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {loading ? (
+                      <div className="text-center py-8 text-slate-400">로딩 중...</div>
+                    ) : logs.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">실행 로그가 없습니다</div>
+                    ) : (
+                      logs.slice(0, 30).map((log, i) => (
+                        <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                          <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                            {log.status === 'SUCCESS' ? '성공' : '실패'}
+                          </span>
+                          <span className="font-semibold text-[#1E9EDE]">[{log.botName}]</span>
+                          <span className="text-slate-700 truncate flex-1">{log.message}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* EV1 - 재고 관리 (개발 중) */}
+          {activeTab === 'ev1' && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 shadow-sm text-center">
+              <div className="text-6xl mb-4">{currentConfig.icon}</div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">{currentConfig.title}</h2>
+              <p className="text-slate-500 mb-6">재고 수불부, 발주 알림, 이벤트 관리 기능 개발 중입니다.</p>
+              <div className="inline-block px-4 py-2 bg-slate-100 rounded-lg text-sm text-slate-600">
+                🚧 Coming Soon
+              </div>
+            </div>
+          )}
+
+          {/* EV2 - 생산성 봇 */}
+          {activeTab === 'ev2' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-3xl">{currentConfig.icon}</span>
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
+                    <p className="text-sm text-slate-500">데이터 수집 및 분석 자동화</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {currentConfig.bots.map((bot) => {
+                    const status = botStatus[bot.id];
+                    const badge = getStatusBadge(status?.status);
+                    return (
+                      <div key={bot.id} className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-md transition-all">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-900">{bot.name}</h3>
+                            <p className="text-sm text-slate-500 mt-1">
+                              ⏰ {bot.schedule}
+                            </p>
+                          </div>
+                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${badge.bg} ${badge.text}`}>
+                            {badge.label}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">
+                            <span className="text-slate-400">마지막 실행:</span>
+                            <span className="text-slate-700 font-medium ml-2">{formatTime(status?.endTime)}</span>
+                          </div>
+                          {bot.hasManualRun && (
+                            <button className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95">
+                              ▶️ 수동 실행
+                            </button>
+                          )}
+                        </div>
+                        
+                        {status?.message && (
+                          <div className="mt-3 p-3 bg-slate-100 rounded-lg">
+                            <p className="text-xs text-slate-600">{status.message}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">📋 EV2 실행 로그</h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {logs.filter(log => log.botId === 'oliveyoung').slice(0, 15).map((log, i) => (
+                    <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg">
+                      <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                        {log.status === 'SUCCESS' ? '성공' : '실패'}
+                      </span>
+                      <span className="text-slate-700 truncate flex-1">{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* EV3 - 백오피스 */}
+          {activeTab === 'ev3' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-3xl">{currentConfig.icon}</span>
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
+                    <p className="text-sm text-slate-500">회계 및 재무 자동화</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {currentConfig.bots.map((bot) => {
+                    const status = botStatus[bot.id];
+                    const badge = getStatusBadge(status?.status);
+                    return (
+                      <div key={bot.id} className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-md transition-all">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-900">{bot.name}</h3>
+                            <p className="text-sm text-slate-500 mt-1">
+                              ⏰ {bot.schedule}
+                            </p>
+                          </div>
+                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${badge.bg} ${badge.text}`}>
+                            {badge.label}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">
+                            <span className="text-slate-400">마지막 실행:</span>
+                            <span className="text-slate-700 font-medium ml-2">{formatTime(status?.endTime)}</span>
+                          </div>
+                          {bot.hasManualRun && (
+                            <button className="px-4 py-2 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-semibold rounded-lg transition-all active:scale-95">
+                              ▶️ 수동 실행
+                            </button>
+                          )}
+                        </div>
+                        
+                        {status?.message && (
+                          <div className="mt-3 p-3 bg-slate-100 rounded-lg">
+                            <p className="text-xs text-slate-600">{status.message}</p>
+                          </div>
+                        )}
+
+                        {/* 캐시 잔액 특별 표시 */}
+                        {bot.id === 'cash-bot' && status?.result?.difference !== undefined && (
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-amber-700 font-medium">차이 금액:</span>
+                              <span className="text-amber-900 font-bold">
+                                {status.result.difference.toLocaleString()}원
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">📋 EV3 실행 로그</h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {logs.filter(log => log.botId === 'accounting' || log.botId === 'cash-bot').slice(0, 15).map((log, i) => (
+                    <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg">
+                      <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                        {log.status === 'SUCCESS' ? '성공' : '실패'}
+                      </span>
+                      <span className="font-semibold text-[#8B5CF6]">[{log.botName}]</span>
+                      <span className="text-slate-700 truncate flex-1">{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 텔레그램 안내 */}
+          <div className="bg-gradient-to-r from-[#1E9EDE]/10 to-[#3B82F6]/10 border border-[#1E9EDE]/20 rounded-xl p-5">
+            <div className="flex items-start gap-4">
+              <span className="text-3xl">💬</span>
+              <div className="flex-1">
+                <div className="font-bold text-slate-900 mb-2">텔레그램 명령어</div>
+                <div className="space-y-1 text-sm text-slate-600">
+                  <div><code className="bg-white px-2 py-1 rounded font-mono">/help</code> - 도움말</div>
+                  <div><code className="bg-white px-2 py-1 rounded font-mono">/status</code> - 전체 상태 확인</div>
+                  <div><code className="bg-white px-2 py-1 rounded font-mono">/run 올리브영</code> - 올리브영 스크래퍼 실행</div>
+                  <div><code className="bg-white px-2 py-1 rounded font-mono">/run 회계</code> - 회계전표 업로드 실행</div>
+                  <div><code className="bg-white px-2 py-1 rounded font-mono">/run 캐시</code> - 캐시 잔액 확인 실행</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </main>
       </div>
     </>
