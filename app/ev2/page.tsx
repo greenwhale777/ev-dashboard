@@ -139,7 +139,7 @@ export default function EV2Page() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/')}
-                className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center hover:bg-[#1E293B] transition-colors"
+                className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center hover:bg-[#1E293B] transition-all cursor-pointer active:scale-90 hover:scale-105"
               >
                 <span className="text-white font-bold text-lg">←</span>
               </button>
@@ -187,7 +187,7 @@ export default function EV2Page() {
                 className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${
                   analyzing || !url
                     ? 'bg-slate-300 cursor-not-allowed text-slate-500'
-                    : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98]'
+                    : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
                 }`}
               >
                 {analyzing ? '분석 중...' : '🚀 분석 시작'}
@@ -223,13 +223,13 @@ export default function EV2Page() {
                 <div className="space-y-1 text-xs">
                   <button
                     onClick={() => setUrl('https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000243074')}
-                    className="block hover:text-blue-600 text-slate-600"
+                    className="block hover:text-blue-600 text-slate-600 cursor-pointer"
                   >
                     • 라네즈 크림스킨
                   </button>
                   <button
                     onClick={() => setUrl('https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000162054')}
-                    className="block hover:text-blue-600 text-slate-600"
+                    className="block hover:text-blue-600 text-slate-600 cursor-pointer"
                   >
                     • 라운드랩 독도토너
                   </button>
@@ -243,7 +243,7 @@ export default function EV2Page() {
               <h3 className="text-xl font-bold text-slate-900">📋 분석 결과 ({results?.length || 0})</h3>
               <button
                 onClick={fetchResults}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-all"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-all cursor-pointer active:scale-95"
               >
                 🔄 새로고침
               </button>
@@ -265,7 +265,7 @@ export default function EV2Page() {
                   <button
                     key={result.id}
                     onClick={() => router.push(`/ev2/analysis/${result.id}`)}
-                    className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all text-left"
+                    className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all text-left cursor-pointer active:scale-[0.99]"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -273,7 +273,7 @@ export default function EV2Page() {
                         <div className="flex items-center gap-3 text-sm text-slate-500">
                           <span>🏢 {result.brand}</span>
                           <span>•</span>
-                          <span>📁 {result.category}</span>
+                          <span>📍 {result.category}</span>
                         </div>
                       </div>
                       <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600">
