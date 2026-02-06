@@ -24,9 +24,9 @@ export default function EV2Page() {
     try {
       const response = await fetch(`${API_URL}/api/analyze/results?limit=20`);
       const data = await response.json();
-      
+
       if (data.success) {
-        setResults(data.data);
+        setResults(data.results || data.data);
       }
       setLoading(false);
     } catch (err) {
@@ -72,10 +72,10 @@ export default function EV2Page() {
           const statusData: any = await statusRes.json();
 
           // progress가 객체일 수 있음
-          const progressValue = typeof statusData.progress === 'object' 
+          const progressValue = typeof statusData.progress === 'object'
             ? (statusData.progress?.percent || 0)
             : (statusData.progress || 0);
-          
+
           const progressMsg = typeof statusData.progress === 'object'
             ? (statusData.progress?.currentStep || '처리 중...')
             : (statusData.progressMessage || '처리 중...');
@@ -88,7 +88,7 @@ export default function EV2Page() {
             setAnalyzing(false);
             setUrl('');
             fetchResults();
-            
+
             setTimeout(() => {
               router.push(`/ev2/analysis/${analysisId}`);
             }, 1000);
@@ -184,11 +184,10 @@ export default function EV2Page() {
               <button
                 onClick={startAnalysis}
                 disabled={analyzing || !url}
-                className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${
-                  analyzing || !url
+                className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${analyzing || !url
                     ? 'bg-slate-300 cursor-not-allowed text-slate-500'
                     : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
-                }`}
+                  }`}
               >
                 {analyzing ? '분석 중...' : '🚀 분석 시작'}
               </button>
