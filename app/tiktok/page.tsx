@@ -251,18 +251,18 @@ export default function TikTokAnalyzerPage() {
       {/* Header */}
       <div className="bg-[#0F172A] text-white">
         <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-3 mb-1">
-            <button
-              onClick={() => router.push('/ev2')}
-              className="text-white/60 hover:text-white transition text-sm"
+          <div className="flex items-center gap-4 mb-1">
+            
+              href="/"
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition text-sm flex items-center gap-2"
             >
-              ← EV2
-            </button>
+              ← 메인으로
+            </a>
             <span className="text-white/30">|</span>
             <span className="text-2xl">🎵</span>
-            <h1 className="text-2xl font-bold tracking-tight">TikTok 광고 분석</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">TikTok 광고 분석</h1>
           </div>
-          <p className="text-white/60 text-sm mt-1">키워드 기반 TikTok 인기 콘텐츠 수집 · 분석</p>
+          <p className="text-white/60 text-sm mt-1 ml-1">키워드 기반 TikTok 인기 콘텐츠 수집 · 분석</p>
         </div>
       </div>
 
