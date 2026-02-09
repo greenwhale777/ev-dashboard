@@ -256,7 +256,7 @@ export default function TikTokAnalyzerPage() {
               href="/"
               className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition text-sm flex items-center gap-2"
             >
-              ← 메인으로
+              &larr; 메인으로
             </a>
             <span className="text-white/30">|</span>
             <span className="text-2xl">🎵</span>
