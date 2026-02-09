@@ -143,50 +143,14 @@ export default function EV2Page() {
                 <span className="text-white font-bold text-lg">EV</span>
               </button>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">EV2 - 부스팅 분석</h1>
-                <p className="text-sm text-slate-500">올리브영 상품 & TikTok 광고 분석</p>
+                <h1 className="text-xl font-bold text-slate-900">EV2 - 상세페이지 분석</h1>
+                <p className="text-sm text-slate-500">올리브영 상품 AI 분석</p>
               </div>
             </div>
           </div>
         </header>
 
         <main className="max-w-7xl mx-auto px-6 pt-6 pb-8">
-          {/* 봇 선택 카드 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-2xl border-2 border-blue-200 p-5 shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">🔍</span>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">봇 #2 상세페이지 분석</h3>
-                  <p className="text-xs text-slate-500">올리브영 상품 AI 분석</p>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-3">상품 URL을 입력하면 AI가 상세페이지를 분석하여 마케팅 인사이트를 제공합니다.</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full font-medium">현재 페이지</span>
-                <span className="text-xs text-slate-400">분석 {results?.length || 0}건</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => router.push('/tiktok')}
-              className="bg-white rounded-2xl border-2 border-slate-200 p-5 shadow-sm hover:border-purple-300 hover:shadow-md transition-all text-left cursor-pointer active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">🎵</span>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">봇 #3 TikTok 광고 분석</h3>
-                  <p className="text-xs text-slate-500">키워드 기반 인기 콘텐츠 수집</p>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-3">키워드별 TikTok 상위 영상을 자동 수집하고 트렌드 변동을 분석합니다.</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 bg-purple-50 text-purple-600 rounded-full font-medium">바로가기 →</span>
-                <span className="text-xs text-slate-400">매일 10시 자동 수집</span>
-              </div>
-            </button>
-          </div>
-
           {/* 상품 분석 섹션 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
             <div className="flex items-center gap-3 mb-6">
@@ -221,8 +185,8 @@ export default function EV2Page() {
                 onClick={startAnalysis}
                 disabled={analyzing || !url}
                 className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${analyzing || !url
-                  ? 'bg-slate-300 cursor-not-allowed text-slate-500'
-                  : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
+                    ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                    : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
                   }`}
               >
                 {analyzing ? '분석 중...' : '🚀 분석 시작'}
