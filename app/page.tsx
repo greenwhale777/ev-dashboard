@@ -55,7 +55,7 @@ const botConfigs = {
         schedule: '수동 실행',
         hasManualRun: true,
         link: '/ev2'
-      }
+      },
       {
         id: 'tiktok-analyzer',
         name: 'TikTok 광고 분석',
