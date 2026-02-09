@@ -251,13 +251,8 @@ export default function TikTokAnalyzerPage() {
       {/* Header */}
       <div className="bg-[#0F172A] text-white">
         <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4 mb-1">
-            
-              href="/"
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition text-sm flex items-center gap-2"
-            >
-              &larr; 메인으로
-            </a>
+                    <div className="flex items-center gap-4 mb-1">
+            <a href="/" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition text-sm flex items-center gap-2">{"← 메인으로"}</a>
             <span className="text-white/30">|</span>
             <span className="text-2xl">🎵</span>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">TikTok 광고 분석</h1>
