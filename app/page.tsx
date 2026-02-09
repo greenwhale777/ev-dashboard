@@ -61,7 +61,7 @@ const botConfigs = {
         name: 'TikTok 광고 분석',
         schedule: '매일 10:00',
         hasManualRun: false,
-        link: '/ev2/tiktok'
+        link: '/tiktok'
       }
     ]
   },

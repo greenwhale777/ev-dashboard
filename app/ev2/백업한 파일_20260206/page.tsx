@@ -24,9 +24,9 @@ export default function EV2Page() {
     try {
       const response = await fetch(`${API_URL}/api/analyze/results?limit=20`);
       const data = await response.json();
-
+      
       if (data.success) {
-        setResults(data.results || data.data);
+        setResults(data.data);
       }
       setLoading(false);
     } catch (err) {
@@ -71,10 +71,11 @@ export default function EV2Page() {
           const statusRes = await fetch(`${API_URL}/api/analyze/${analysisId}/status`);
           const statusData: any = await statusRes.json();
 
-          const progressValue = typeof statusData.progress === 'object'
+          // progress가 객체일 수 있음
+          const progressValue = typeof statusData.progress === 'object' 
             ? (statusData.progress?.percent || 0)
             : (statusData.progress || 0);
-
+          
           const progressMsg = typeof statusData.progress === 'object'
             ? (statusData.progress?.currentStep || '처리 중...')
             : (statusData.progressMessage || '처리 중...');
@@ -87,7 +88,7 @@ export default function EV2Page() {
             setAnalyzing(false);
             setUrl('');
             fetchResults();
-
+            
             setTimeout(() => {
               router.push(`/ev2/analysis/${analysisId}`);
             }, 1000);
@@ -105,7 +106,7 @@ export default function EV2Page() {
         clearInterval(pollStatus);
         if (analyzing) {
           setAnalyzing(false);
-          setError('분석 시간이 초과했습니다.');
+          setError('분석 시간이 초과되었습니다.');
         }
       }, 180000);
 
@@ -138,56 +139,19 @@ export default function EV2Page() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/')}
-                className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center hover:bg-[#1E293B] transition-all cursor-pointer active:scale-90 hover:scale-105"
+                className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center hover:bg-[#1E293B] transition-colors"
               >
-                <span className="text-white font-bold text-lg">EV</span>
+                <span className="text-white font-bold text-lg">←</span>
               </button>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">EV2 - 부스팅 분석</h1>
-                <p className="text-sm text-slate-500">올리브영 상품 & TikTok 광고 분석</p>
+                <h1 className="text-xl font-bold text-slate-900">EV2 - 상세페이지 분석</h1>
+                <p className="text-sm text-slate-500">올리브영 상품 AI 분석</p>
               </div>
             </div>
           </div>
         </header>
 
         <main className="max-w-7xl mx-auto px-6 pt-6 pb-8">
-          {/* 봇 선택 카드 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-2xl border-2 border-blue-200 p-5 shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">🔍</span>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">봇 #2 상세페이지 분석</h3>
-                  <p className="text-xs text-slate-500">올리브영 상품 AI 분석</p>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-3">상품 URL을 입력하면 AI가 상세페이지를 분석하여 마케팅 인사이트를 제공합니다.</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full font-medium">현재 페이지</span>
-                <span className="text-xs text-slate-400">분석 {results?.length || 0}건</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => router.push('/tiktok')}
-              className="bg-white rounded-2xl border-2 border-slate-200 p-5 shadow-sm hover:border-purple-300 hover:shadow-md transition-all text-left cursor-pointer active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">🎵</span>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">봇 #3 TikTok 광고 분석</h3>
-                  <p className="text-xs text-slate-500">키워드 기반 인기 콘텐츠 수집</p>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600 mb-3">키워드별 TikTok 상위 영상을 자동 수집하고 트렌드 변동을 분석합니다.</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 bg-purple-50 text-purple-600 rounded-full font-medium">바로가기 →</span>
-                <span className="text-xs text-slate-400">매일 10시 자동 수집</span>
-              </div>
-            </button>
-          </div>
-
-          {/* 상품 분석 섹션 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
             <div className="flex items-center gap-3 mb-6">
               <span className="text-3xl">🔍</span>
@@ -200,7 +164,7 @@ export default function EV2Page() {
             {error && (
               <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
                 <div className="flex items-center gap-2 text-red-600">
-                  <span>❌</span>
+                  <span>⚠️</span>
                   <span className="font-medium">{error}</span>
                 </div>
               </div>
@@ -220,10 +184,11 @@ export default function EV2Page() {
               <button
                 onClick={startAnalysis}
                 disabled={analyzing || !url}
-                className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${analyzing || !url
-                  ? 'bg-slate-300 cursor-not-allowed text-slate-500'
-                  : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
-                  }`}
+                className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${
+                  analyzing || !url
+                    ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                    : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98]'
+                }`}
               >
                 {analyzing ? '분석 중...' : '🚀 분석 시작'}
               </button>
@@ -247,39 +212,38 @@ export default function EV2Page() {
 
                 <div className="mt-4 text-sm text-blue-600">
                   <p>⏱️ 예상 소요 시간: 1-2분</p>
-                  <p className="mt-1">📌 완료되면 자동으로 결과 페이지로 이동합니다</p>
+                  <p className="mt-1">💡 완료되면 자동으로 결과 페이지로 이동합니다.</p>
                 </div>
               </div>
             )}
 
             {!analyzing && (
               <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <p className="text-sm font-semibold text-slate-700 mb-2">📌 테스트 URL:</p>
+                <p className="text-sm font-semibold text-slate-700 mb-2">💡 테스트 URL:</p>
                 <div className="space-y-1 text-xs">
                   <button
                     onClick={() => setUrl('https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000243074')}
-                    className="block hover:text-blue-600 text-slate-600 cursor-pointer"
+                    className="block hover:text-blue-600 text-slate-600"
                   >
-                    → 라네즈 립슬리핑마스크
+                    • 라네즈 크림스킨
                   </button>
                   <button
                     onClick={() => setUrl('https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000162054')}
-                    className="block hover:text-blue-600 text-slate-600 cursor-pointer"
+                    className="block hover:text-blue-600 text-slate-600"
                   >
-                    → 라운드랩 자작나무 수분토너
+                    • 라운드랩 독도토너
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* 분석 결과 목록 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-slate-900">📋 분석 결과 ({results?.length || 0})</h3>
               <button
                 onClick={fetchResults}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-all cursor-pointer active:scale-95"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-all"
               >
                 🔄 새로고침
               </button>
@@ -301,15 +265,15 @@ export default function EV2Page() {
                   <button
                     key={result.id}
                     onClick={() => router.push(`/ev2/analysis/${result.id}`)}
-                    className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all text-left cursor-pointer active:scale-[0.99]"
+                    className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all text-left"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h4 className="text-lg font-bold text-slate-900 mb-1">{result.productName}</h4>
                         <div className="flex items-center gap-3 text-sm text-slate-500">
-                          <span>🏷️ {result.brand}</span>
-                          <span>·</span>
-                          <span>📂 {result.category}</span>
+                          <span>🏢 {result.brand}</span>
+                          <span>•</span>
+                          <span>📁 {result.category}</span>
                         </div>
                       </div>
                       <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600">
