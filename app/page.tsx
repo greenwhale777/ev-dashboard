@@ -56,6 +56,13 @@ const botConfigs = {
         hasManualRun: true,
         link: '/ev2'
       }
+      {
+        id: 'tiktok-analyzer',
+        name: 'TikTok 광고 분석',
+        schedule: '매일 10:00',
+        hasManualRun: false,
+        link: '/ev2/tiktok'
+      }
     ]
   },
   ev3: {
