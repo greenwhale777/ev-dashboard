@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 // API 서버 URL
 const API_URL = process.env.NEXT_PUBLIC_EV0_API_URL || 'https://ev0-agent-production.up.railway.app';
 
-// 로그 타입
 interface ExecutionLog {
   botId: string;
   botName: string;
@@ -118,7 +117,6 @@ export default function Dashboard() {
     try {
       setApiError(null);
       const logsRes = await fetch(`${API_URL}/api/logs`);
-      if (!logsRes.ok) throw new Error('로그 조회 실패');
       const logsData = await logsRes.json();
       setLogs(logsData);
 
@@ -222,7 +220,6 @@ export default function Dashboard() {
                   <span className="text-3xl">{currentConfig.icon}</span>
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
-                    <p className="text-sm text-slate-500">시스템 상태 및 통합 로그</p>
                   </div>
                 </div>
 
@@ -246,12 +243,11 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">📋 전체 실행 로그</h3>
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {loading ? (
                       <div className="text-center py-8 text-slate-400">로딩 중...</div>
                     ) : logs.length === 0 ? (
-                      <div className="text-center py-8 text-slate-400">실행 로그가 없습니다</div>
+                      <div className="text-center py-8 text-slate-400">실행 기록이 없습니다</div>
                     ) : (
                       logs.slice(0, 30).map((log, i) => (
                         <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
@@ -317,12 +313,18 @@ export default function Dashboard() {
                             <span className="text-slate-400">마지막 실행:</span>
                             <span className="text-slate-700 font-medium ml-2">{formatTime(status?.endTime)}</span>
                           </div>
-                          {bot.hasManualRun && (
+                          {'link' in bot && bot.link ? (
+                            <a
+                              href={bot.link}
+                              className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95 inline-block"
+                            >
+                              ▶ 실행
+                            </a>
+                          ) : bot.hasManualRun && (
                             <button
-                              onClick={() => 'link' in bot && bot.link ? window.location.href = bot.link : null}
                               className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95"
                             >
-                              ▶️ 수동 실행
+                              ▶ 실행
                             </button>
                           )}
                         </div>
@@ -341,12 +343,13 @@ export default function Dashboard() {
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">📋 EV2 실행 로그</h3>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {logs.filter(log => log.botId === 'oliveyoung').slice(0, 15).map((log, i) => (
+                  {logs.filter(log => log.botId === 'oliveyoung' || log.botId === 'page-analyzer' || log.botId === 'tiktok-analyzer').slice(0, 15).map((log, i) => (
                     <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg">
                       <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
                       <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                         {log.status === 'SUCCESS' ? '성공' : '실패'}
                       </span>
+                      <span className="font-semibold text-[#3B82F6]">[{log.botName}]</span>
                       <span className="text-slate-700 truncate flex-1">{log.message}</span>
                     </div>
                   ))}
@@ -392,7 +395,7 @@ export default function Dashboard() {
                           </div>
                           {bot.hasManualRun && (
                             <button className="px-4 py-2 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-semibold rounded-lg transition-all active:scale-95">
-                              ▶️ 수동 실행
+                              ▶ 실행
                             </button>
                           )}
                         </div>
