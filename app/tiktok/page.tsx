@@ -195,6 +195,7 @@ export default function TikTokAnalyzerPage() {
   };
 
   const deleteKeyword = async (id: number) => {
+    if (!confirm('이 키워드를 삭제하시겠습니까?')) return;
     try {
       await fetch(`${API_URL}/api/tiktok/keywords/${id}`, { method: 'DELETE' });
       fetchKeywords();
@@ -341,11 +342,10 @@ export default function TikTokAnalyzerPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'bg-[#0F172A] text-white'
-                  : 'bg-white text-gray-600 border hover:bg-gray-50'
-              }`}
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition whitespace-nowrap ${activeTab === tab.key
+                ? 'bg-[#0F172A] text-white'
+                : 'bg-white text-gray-600 border hover:bg-gray-50'
+                }`}
             >
               {tab.label}
               {tab.count > 0 && (
@@ -486,11 +486,10 @@ export default function TikTokAnalyzerPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => toggleKeywordHistory(kw)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                          expandedKeyword === kw.id
-                            ? 'bg-[#0F172A] text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${expandedKeyword === kw.id
+                          ? 'bg-[#0F172A] text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
                       >
                         📋 검색이력 {expandedKeyword === kw.id ? '▲' : '▼'}
                       </button>
