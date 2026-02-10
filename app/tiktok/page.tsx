@@ -364,26 +364,35 @@ export default function TikTokAnalyzerPage() {
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight">TikTok 광고 분석</h1>
               </div>
             </div>
-            <button
-              onClick={runAllKeywords}
-              disabled={isRunning}
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white rounded-xl font-semibold text-sm transition active:scale-95 disabled:cursor-not-allowed flex items-center gap-2 justify-center min-w-[180px]"
-            >
-              {isRunning ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  실행 중...
-                </>
-              ) : (
-                <>
-                  <span>🚀</span>
-                  전체 키워드 실행
-                </>
-              )}
-            </button>
+            {isRunning ? (
+              <button
+                onClick={async () => {
+                  try {
+                    await fetch(`${API_URL}/api/tiktok/tasks/cancel`, { method: 'POST' });
+                    setIsRunning(false);
+                    setSearchingKeywords(new Set());
+                    setActiveTasks([]);
+                    setRunMessage('⏹ 실행이 중단되었습니다.');
+                    setTimeout(() => setRunMessage(''), 5000);
+                  } catch {}
+                }}
+                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold text-sm transition active:scale-95 flex items-center gap-2 justify-center min-w-[180px]"
+              >
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                ⏹ 중단하기
+              </button>
+            ) : (
+              <button
+                onClick={runAllKeywords}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold text-sm transition active:scale-95 flex items-center gap-2 justify-center min-w-[180px]"
+              >
+                <span>🚀</span>
+                전체 키워드 실행
+              </button>
+            )}
           </div>
           <p className="text-white/60 text-sm mt-2">키워드 기반 TikTok 인기 콘텐츠 수집 · 분석 (TOP 30)</p>
 
