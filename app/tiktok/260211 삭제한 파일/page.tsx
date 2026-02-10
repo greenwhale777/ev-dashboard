@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 // ============================================================
@@ -39,15 +39,6 @@ interface Keyword {
   last_searched: string | null;
 }
 
-interface TaskStatus {
-  id: number;
-  type: string;
-  keyword: string | null;
-  status: string;
-  progress: number | null;
-  progress_message: string | null;
-}
-
 // ============================================================
 // API URL
 // ============================================================
@@ -73,71 +64,12 @@ export default function TikTokAnalyzerPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [runMessage, setRunMessage] = useState('');
 
-  // Active tasks tracking
-  const [activeTasks, setActiveTasks] = useState<TaskStatus[]>([]);
-  const [searchingKeywords, setSearchingKeywords] = useState<Set<string>>(new Set());
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
-
   // Keyword history
   const [expandedKeyword, setExpandedKeyword] = useState<number | null>(null);
   const [keywordSearches, setKeywordSearches] = useState<Record<number, TikTokSearch[]>>({});
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'search' | 'keywords'>('search');
-
-  // ============================================================
-  // Task Status Polling
-  // ============================================================
-  const pollTaskStatus = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/tiktok/tasks/active`);
-      const data = await res.json();
-      if (data.success) {
-        const tasks: TaskStatus[] = data.data || [];
-        setActiveTasks(tasks);
-
-        // Update searching keywords set
-        const activeKeywords = new Set<string>();
-        let hasRunAll = false;
-        tasks.forEach((task: TaskStatus) => {
-          if (task.status === 'pending' || task.status === 'running') {
-            if (task.type === 'run_all') {
-              hasRunAll = true;
-            }
-            if (task.keyword) {
-              activeKeywords.add(task.keyword.toLowerCase());
-            }
-          }
-        });
-        setSearchingKeywords(activeKeywords);
-        setIsRunning(hasRunAll);
-
-        // Stop polling if no active tasks
-        if (tasks.length === 0 && pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
-      }
-    } catch (err) {
-      console.error('Failed to poll task status:', err);
-    }
-  }, []);
-
-  const startPolling = useCallback(() => {
-    if (pollingRef.current) return;
-    pollTaskStatus(); // immediate first call
-    pollingRef.current = setInterval(pollTaskStatus, 5000);
-  }, [pollTaskStatus]);
-
-  useEffect(() => {
-    // Initial check for active tasks
-    pollTaskStatus();
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-    };
-  }, [pollTaskStatus]);
 
   // ============================================================
   // Data Fetching
@@ -200,16 +132,15 @@ export default function TikTokAnalyzerPage() {
       const data = await res.json();
 
       if (data.success) {
-        setRunMessage('✅ 실행 요청 완료! PC에서 순차 스크래핑이 시작됩니다.');
-        startPolling();
+        setRunMessage('✅ 실행 요청 완료! PC에서 곧 스크래핑이 시작됩니다.');
         setTimeout(() => setRunMessage(''), 8000);
       } else {
-        setRunMessage(`❌ ${data.error || '요청 실패'}`);
-        setIsRunning(false);
+        setRunMessage(`⏳ ${data.error || '요청 실패'}`);
         setTimeout(() => setRunMessage(''), 5000);
       }
     } catch (err) {
       setError('서버 연결 실패');
+    } finally {
       setIsRunning(false);
     }
   };
@@ -235,9 +166,7 @@ export default function TikTokAnalyzerPage() {
         throw new Error(data.error || '검색 요청 실패');
       }
 
-      setRunMessage('✅ 검색 요청 완료! PC에서 순차 스크래핑이 시작됩니다.');
-      setSearchingKeywords(prev => new Set(prev).add(keyword.trim().toLowerCase()));
-      startPolling();
+      setRunMessage('✅ 검색 요청 완료! PC에서 곧 스크래핑이 시작됩니다.');
       setTimeout(() => setRunMessage(''), 8000);
 
     } catch (err: any) {
@@ -289,17 +218,6 @@ export default function TikTokAnalyzerPage() {
   // ============================================================
   // Helpers
   // ============================================================
-  const isKeywordSearching = (keyword: string) => {
-    return searchingKeywords.has(keyword.toLowerCase());
-  };
-
-  const getKeywordTask = (keyword: string): TaskStatus | undefined => {
-    return activeTasks.find(
-      t => t.keyword?.toLowerCase() === keyword.toLowerCase() && 
-      (t.status === 'pending' || t.status === 'running')
-    );
-  };
-
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
@@ -325,14 +243,12 @@ export default function TikTokAnalyzerPage() {
     const styles: Record<string, string> = {
       pending: 'bg-gray-100 text-gray-600',
       scraping: 'bg-yellow-100 text-yellow-700',
-      running: 'bg-yellow-100 text-yellow-700',
       completed: 'bg-green-100 text-green-700',
       failed: 'bg-red-100 text-red-700',
     };
     const labels: Record<string, string> = {
       pending: '대기',
       scraping: '수집 중',
-      running: '수집 중',
       completed: '완료',
       failed: '실패',
     };
@@ -342,10 +258,6 @@ export default function TikTokAnalyzerPage() {
       </span>
     );
   };
-
-  // Count active tasks for the run-all progress
-  const completedInBatch = activeTasks.filter(t => t.status === 'completed').length;
-  const totalInBatch = activeTasks.length;
 
   // ============================================================
   // Render
@@ -357,7 +269,7 @@ export default function TikTokAnalyzerPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-4">
-              <a href="/" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition text-sm flex items-center gap-2">← 메인으로</a>
+              <a href="/" className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-semibold transition text-sm flex items-center gap-2">{"← 메인으로"}</a>
               <span className="text-white/30 hidden sm:inline">|</span>
               <div className="flex items-center gap-2">
                 <span className="text-2xl">🎵</span>
@@ -367,15 +279,12 @@ export default function TikTokAnalyzerPage() {
             <button
               onClick={runAllKeywords}
               disabled={isRunning}
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white rounded-xl font-semibold text-sm transition active:scale-95 disabled:cursor-not-allowed flex items-center gap-2 justify-center min-w-[180px]"
+              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white rounded-xl font-semibold text-sm transition active:scale-95 disabled:cursor-not-allowed flex items-center gap-2 justify-center"
             >
               {isRunning ? (
                 <>
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  실행 중...
+                  <span className="animate-spin">⏳</span>
+                  요청 중...
                 </>
               ) : (
                 <>
@@ -390,34 +299,6 @@ export default function TikTokAnalyzerPage() {
           {runMessage && (
             <div className="mt-3 px-4 py-2.5 bg-white/10 rounded-xl text-sm">
               {runMessage}
-            </div>
-          )}
-
-          {/* Active Tasks Progress Bar */}
-          {activeTasks.length > 0 && activeTasks.some(t => t.status === 'pending' || t.status === 'running') && (
-            <div className="mt-3 px-4 py-3 bg-white/10 rounded-xl">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  스크래핑 진행 중
-                </span>
-                <span className="text-white/70">
-                  {activeTasks.filter(t => t.status === 'running').length > 0 && (
-                    <>현재: {activeTasks.find(t => t.status === 'running')?.keyword || '처리 중'}</>
-                  )}
-                </span>
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-1.5">
-                <div 
-                  className="bg-emerald-400 h-1.5 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${totalInBatch > 0 ? Math.max((activeTasks.filter(t => t.status === 'completed' || t.status === 'failed').length / totalInBatch) * 100, 5) : 0}%` 
-                  }}
-                />
-              </div>
             </div>
           )}
         </div>
@@ -537,7 +418,7 @@ export default function TikTokAnalyzerPage() {
                           <span className="flex items-center gap-1 text-gray-500">🔖 {formatNumber(video.bookmarks)}</span>
                           <span className="flex items-center gap-1 text-gray-500">🔗 {formatNumber(video.shares)}</span>
                           {video.views && video.views !== 'N/A' && (
-                            <span className="flex items-center gap-1 text-gray-500">👀 {formatNumber(video.views)}</span>
+                            <span className="flex items-center gap-1 text-gray-500">👁️ {formatNumber(video.views)}</span>
                           )}
                         </div>
                       </div>
@@ -548,7 +429,7 @@ export default function TikTokAnalyzerPage() {
                         rel="noopener noreferrer"
                         className="flex-shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600 transition"
                       >
-                        TikTok ↗
+                        TikTok →
                       </a>
                     </div>
                   </div>
@@ -591,98 +472,78 @@ export default function TikTokAnalyzerPage() {
 
             {/* Keyword List with History */}
             <div className="space-y-2">
-              {keywords.map((kw) => {
-                const kwSearching = isKeywordSearching(kw.keyword);
-                const kwTask = getKeywordTask(kw.keyword);
-
-                return (
-                  <div key={kw.id} className={`bg-white rounded-xl border overflow-hidden ${kwSearching ? 'border-yellow-300 bg-yellow-50/30' : ''}`}>
-                    {/* Keyword Row */}
-                    <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{kw.keyword}</span>
-                          {kwSearching && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                              <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              {kwTask?.status === 'running' ? '🔄 수집중...' : '⏳ 대기중'}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-gray-400">
-                          검색 {kw.search_count}회
-                          {kw.last_searched && ` · 마지막 ${formatShortDate(kw.last_searched)}`}
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => toggleKeywordHistory(kw)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${expandedKeyword === kw.id
-                            ? 'bg-[#0F172A] text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                          📋 검색이력 {expandedKeyword === kw.id ? '▲' : '▼'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSearchKeyword(kw.keyword);
-                            startSearch(kw.keyword);
-                          }}
-                          disabled={kwSearching}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${kwSearching
-                            ? 'bg-yellow-100 text-yellow-600 cursor-not-allowed'
-                            : 'bg-[#1E9EDE] text-white hover:bg-[#1789c4]'
-                            }`}
-                        >
-                          {kwSearching ? '🔄 수집중...' : '▶ 검색'}
-                        </button>
-                        <button
-                          onClick={() => deleteKeyword(kw.id)}
-                          className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"
-                        >
-                          삭제
-                        </button>
-                      </div>
+              {keywords.map((kw) => (
+                <div key={kw.id} className="bg-white rounded-xl border overflow-hidden">
+                  {/* Keyword Row */}
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <span className="font-medium text-gray-900">{kw.keyword}</span>
+                      <span className="text-xs text-gray-400 ml-3">
+                        검색 {kw.search_count}회
+                        {kw.last_searched && ` · 마지막 ${formatShortDate(kw.last_searched)}`}
+                      </span>
                     </div>
-
-                    {/* Expanded History */}
-                    {expandedKeyword === kw.id && (
-                      <div className="border-t bg-gray-50 px-4 py-3">
-                        {keywordSearches[kw.id] ? (
-                          keywordSearches[kw.id].length > 0 ? (
-                            <div className="space-y-1.5">
-                              {keywordSearches[kw.id].map((search) => (
-                                <button
-                                  key={search.id}
-                                  onClick={() => fetchSearchDetail(search.id)}
-                                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg border hover:shadow-sm hover:border-[#1E9EDE] transition text-left"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xs text-gray-500 w-28">{formatShortDate(search.started_at)}</span>
-                                    <span className="text-sm font-medium text-gray-700">{search.video_count}개 영상</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {statusBadge(search.status)}
-                                    <span className="text-gray-300 text-sm">→</span>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-400 text-center py-3">검색이력이 없습니다</p>
-                          )
-                        ) : (
-                          <p className="text-sm text-gray-400 text-center py-3">로딩 중...</p>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => toggleKeywordHistory(kw)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${expandedKeyword === kw.id
+                          ? 'bg-[#0F172A] text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                      >
+                        📋 검색이력 {expandedKeyword === kw.id ? '▲' : '▼'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSearchKeyword(kw.keyword);
+                          startSearch(kw.keyword);
+                        }}
+                        className="px-3 py-1.5 bg-[#1E9EDE] text-white rounded-lg text-xs font-medium hover:bg-[#1789c4] transition"
+                      >
+                        ▶ 검색
+                      </button>
+                      <button
+                        onClick={() => deleteKeyword(kw.id)}
+                        className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </div>
-                );
-              })}
+
+                  {/* Expanded History */}
+                  {expandedKeyword === kw.id && (
+                    <div className="border-t bg-gray-50 px-4 py-3">
+                      {keywordSearches[kw.id] ? (
+                        keywordSearches[kw.id].length > 0 ? (
+                          <div className="space-y-1.5">
+                            {keywordSearches[kw.id].map((search) => (
+                              <button
+                                key={search.id}
+                                onClick={() => fetchSearchDetail(search.id)}
+                                className="w-full flex items-center justify-between p-3 bg-white rounded-lg border hover:shadow-sm hover:border-[#1E9EDE] transition text-left"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-gray-500 w-28">{formatShortDate(search.started_at)}</span>
+                                  <span className="text-sm font-medium text-gray-700">{search.video_count}개 영상</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {statusBadge(search.status)}
+                                  <span className="text-gray-300 text-sm">→</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 text-center py-3">검색이력이 없습니다</p>
+                        )
+                      ) : (
+                        <p className="text-sm text-gray-400 text-center py-3">로딩 중...</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
               {keywords.length === 0 && (
                 <div className="bg-white rounded-2xl border p-8 text-center text-gray-400">
                   등록된 키워드가 없습니다
