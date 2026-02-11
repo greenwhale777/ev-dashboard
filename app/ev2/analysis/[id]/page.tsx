@@ -2,59 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import type { AnalysisResult } from '@/types/analysis';
+import type { AnalysisResult, BlockAnalysis, SegmentationPlan, AnalysisMetadata } from '@/types/analysis';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ev2-page-analyzer-production.up.railway.app';
-
-// 블록 분석 타입 정의 (새 구조)
-interface BlockAnalysis {
-  blockNumber: number;
-  blockTitle: string;
-  blockType: string;
-  boundaryReason: string;
-  sourceImageNumbers: number[];
-  keySummary: string[];
-  copywriting: {
-    headline?: string;
-    subCopy?: string;
-    bodyText?: string;
-    emphasisPhrases?: string[];
-    claimStatements?: string[];
-    cta?: string;
-  };
-  dataElements: {
-    statistics?: string[];
-    certifications?: string[];
-    testResults?: string;
-    comparisons?: string;
-    percentages?: string[];
-    beforeAfter?: string;
-  };
-  visualElements: {
-    layout?: string;
-    background?: string;
-    colorScheme?: string;
-    icons?: string[];
-    modelUsage?: string;
-    productShot?: string;
-    overallStyle?: string;
-  };
-}
-
-// 분할 계획 타입
-interface SegmentationPlan {
-  blockNumber: number;
-  shortTitle: string;
-  boundaryReason: string;
-  sourceImageNumbers: number[];
-}
-
-// 분석 메타데이터 타입
-interface AnalysisMetadata {
-  totalBlocks: number;
-  blockTypeDistribution: Record<string, number>;
-  excludedContent: string[] | string;
-}
 
 // 블록 타입별 색상 및 아이콘 매핑
 const blockTypeConfig: Record<string, { color: string; bgColor: string; icon: string; label: string }> = {
