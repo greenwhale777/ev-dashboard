@@ -27,7 +27,6 @@ export interface KeyIngredient {
   benefits: string[];
 }
 
-// 기존 ImageAnalysis (하위 호환)
 export interface ImageAnalysis {
   imageNumber: number;
   topic: string;
@@ -57,56 +56,6 @@ export interface ImageAnalysis {
   };
 }
 
-// 새로운 BlockAnalysis 타입
-export interface BlockAnalysis {
-  blockNumber: number;
-  blockTitle: string;
-  blockType: string;
-  boundaryReason: string;
-  sourceImageNumbers: number[];
-  keySummary: string[];
-  copywriting: {
-    headline?: string;
-    subCopy?: string;
-    bodyText?: string;
-    emphasisPhrases?: string[];
-    claimStatements?: string[];
-    cta?: string;
-  } | null;
-  dataElements: {
-    statistics?: string[];
-    certifications?: string[];
-    testResults?: string;
-    comparisons?: string;
-    percentages?: string[];
-    beforeAfter?: string;
-  } | null;
-  visualElements: {
-    layout?: string;
-    background?: string;
-    colorScheme?: string;
-    icons?: string[];
-    modelUsage?: string;
-    productShot?: string;
-    overallStyle?: string;
-  } | null;
-}
-
-// 분할 계획 타입
-export interface SegmentationPlan {
-  blockNumber: number;
-  shortTitle: string;
-  boundaryReason: string;
-  sourceImageNumbers: number[];
-}
-
-// 분석 메타데이터 타입
-export interface AnalysisMetadata {
-  totalBlocks: number;
-  blockTypeDistribution: Record<string, number>;
-  excludedContent: string[] | string;
-}
-
 export interface AnalysisData {
   productName: string;
   brand: string;
@@ -125,12 +74,7 @@ export interface AnalysisData {
   competitiveAdvantage: string;
   suggestions: string[];
   summary: string;
-  // 기존 (하위 호환)
   imageAnalysis?: ImageAnalysis[];
-  // 새로운 블록 분석
-  blockAnalysis?: BlockAnalysis[];
-  segmentationPlan?: SegmentationPlan[];
-  analysisMetadata?: AnalysisMetadata;
 }
 
 export interface AnalysisResult {
