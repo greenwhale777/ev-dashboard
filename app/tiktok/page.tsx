@@ -48,6 +48,64 @@ interface TaskStatus {
   progress_message: string | null;
 }
 
+interface DailyReport {
+  report_date: string;
+  keyword_count: number;
+  search_count: number;
+  total_videos: number;
+  first_started: string;
+  last_completed: string;
+}
+
+interface DailyReportDetail {
+  date: string;
+  previous_date: string;
+  has_previous: boolean;
+  searches: DailyReportSearch[];
+  total_keywords: number;
+  total_videos: number;
+}
+
+interface DailyReportSearch {
+  id: number;
+  keyword: string;
+  video_count: number;
+  started_at: string;
+  completed_at: string;
+  analysis: any;
+  has_previous: boolean;
+  previous_video_count: number | null;
+}
+
+interface CompareData {
+  keyword: string;
+  date: string;
+  previous_date: string;
+  today_count: number;
+  prev_count: number;
+  new_entries: number;
+  exited_count: number;
+  videos: CompareVideo[];
+  exited_videos: any[];
+}
+
+interface CompareVideo {
+  id: number;
+  rank: number;
+  video_url: string;
+  creator_id: string;
+  creator_name: string;
+  description: string;
+  views: string;
+  likes: string;
+  comments: string;
+  is_new: boolean;
+  prev_rank: number | null;
+  rank_change: number | null;
+  prev_views: string | null;
+  prev_likes: string | null;
+}
+
 // ============================================================
 // API URL
 // ============================================================
@@ -84,7 +142,62 @@ export default function TikTokAnalyzerPage() {
   const [keywordSearches, setKeywordSearches] = useState<Record<number, TikTokSearch[]>>({});
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'search' | 'keywords'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily'>('search');
+
+  // Daily Report state
+  const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<DailyReportDetail | null>(null);
+  const [compareData, setCompareData] = useState<CompareData | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+
+  // ============================================================
+  // Data Fetching
+  // ============================================================
+  const fetchKeywords = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/keywords`);
+      const data = await res.json();
+      if (data.success) {
+        // 최근 수집된 키워드가 위로 오도록 정렬
+        const sorted = (data.data || []).sort((a: Keyword, b: Keyword) => {
+          if (!a.last_searched && !b.last_searched) return 0;
+          if (!a.last_searched) return 1;
+          if (!b.last_searched) return -1;
+          return new Date(b.last_searched).getTime() - new Date(a.last_searched).getTime();
+        });
+        setKeywords(sorted);
+      }
+    } catch (err) {
+      console.error('Failed to fetch keywords:', err);
+    }
+  }, []);
+
+  const fetchSearchDetail = useCallback(async (searchId: number) => {
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/search/${searchId}`);
+      const data = await res.json();
+      if (data.success) {
+        setSelectedSearch(data.data.search);
+        setVideos(data.data.videos || []);
+        setActiveTab('search');
+      }
+    } catch (err) {
+      console.error('Failed to fetch search detail:', err);
+    }
+  }, []);
+
+  const fetchKeywordHistory = useCallback(async (keywordId: number, keyword: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/searches?limit=50`);
+      const data = await res.json();
+      if (data.success) {
+        const filtered = (data.data || []).filter((s: TikTokSearch) => s.keyword === keyword);
+        setKeywordSearches(prev => ({ ...prev, [keywordId]: filtered }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch keyword history:', err);
+    }
+  }, []);
 
   // ============================================================
   // Task Status Polling
@@ -150,55 +263,6 @@ export default function TikTokAnalyzerPage() {
       }
     };
   }, [pollTaskStatus]);
-
-  // ============================================================
-  // Data Fetching
-  // ============================================================
-  const fetchKeywords = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/tiktok/keywords`);
-      const data = await res.json();
-      if (data.success) {
-        // 최근 수집된 키워드가 위로 오도록 정렬
-        const sorted = (data.data || []).sort((a: Keyword, b: Keyword) => {
-          if (!a.last_searched && !b.last_searched) return 0;
-          if (!a.last_searched) return 1;
-          if (!b.last_searched) return -1;
-          return new Date(b.last_searched).getTime() - new Date(a.last_searched).getTime();
-        });
-        setKeywords(sorted);
-      }
-    } catch (err) {
-      console.error('Failed to fetch keywords:', err);
-    }
-  }, []);
-
-  const fetchSearchDetail = useCallback(async (searchId: number) => {
-    try {
-      const res = await fetch(`${API_URL}/api/tiktok/search/${searchId}`);
-      const data = await res.json();
-      if (data.success) {
-        setSelectedSearch(data.data.search);
-        setVideos(data.data.videos || []);
-        setActiveTab('search');
-      }
-    } catch (err) {
-      console.error('Failed to fetch search detail:', err);
-    }
-  }, []);
-
-  const fetchKeywordHistory = useCallback(async (keywordId: number, keyword: string) => {
-    try {
-      const res = await fetch(`${API_URL}/api/tiktok/searches?limit=50`);
-      const data = await res.json();
-      if (data.success) {
-        const filtered = (data.data || []).filter((s: TikTokSearch) => s.keyword === keyword);
-        setKeywordSearches(prev => ({ ...prev, [keywordId]: filtered }));
-      }
-    } catch (err) {
-      console.error('Failed to fetch keyword history:', err);
-    }
-  }, []);
 
   useEffect(() => {
     fetchKeywords();
@@ -271,6 +335,15 @@ export default function TikTokAnalyzerPage() {
   // ============================================================
   // Keyword Management
   // ============================================================
+  const toggleKeywordActive = async (id: number) => {
+    try {
+      await fetch(`${API_URL}/api/tiktok/keywords/${id}/toggle`, { method: 'PATCH' });
+      fetchKeywords();
+    } catch (err) {
+      console.error('Failed to toggle keyword:', err);
+    }
+  };
+
   const addKeyword = async () => {
     if (!newKeyword.trim()) return;
     try {
@@ -306,6 +379,52 @@ export default function TikTokAnalyzerPage() {
       }
     }
   };
+
+  // ============================================================
+  // Daily Report
+  // ============================================================
+  const fetchDailyReports = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/daily-reports`);
+      const data = await res.json();
+      if (data.success) setDailyReports(data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch daily reports:', err);
+    }
+  }, []);
+
+  const fetchReportDetail = async (date: string) => {
+    setLoadingReport(true);
+    setCompareData(null);
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/daily-reports/${date}`);
+      const data = await res.json();
+      if (data.success) setSelectedReport(data.data);
+    } catch (err) {
+      console.error('Failed to fetch report detail:', err);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const fetchCompare = async (date: string, keyword: string) => {
+    setLoadingReport(true);
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/daily-reports/${date}/compare/${encodeURIComponent(keyword)}`);
+      const data = await res.json();
+      if (data.success) setCompareData(data.data);
+    } catch (err) {
+      console.error('Failed to fetch comparison:', err);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'daily') {
+      fetchDailyReports();
+    }
+  }, [activeTab, fetchDailyReports]);
 
   // ============================================================
   // Helpers
@@ -478,6 +597,7 @@ export default function TikTokAnalyzerPage() {
           {[
             { key: 'search', label: '📊 검색 결과', count: videos.length },
             { key: 'keywords', label: '🏷️ 키워드 관리', count: keywords.length },
+            { key: 'daily', label: '📅 Daily Report', count: dailyReports.length },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -617,12 +737,15 @@ export default function TikTokAnalyzerPage() {
                 const kwTask = getKeywordTask(kw.keyword);
 
                 return (
-                  <div key={kw.id} className={`bg-white rounded-xl border overflow-hidden ${kwSearching ? 'border-yellow-300 bg-yellow-50/30' : ''}`}>
+                  <div key={kw.id} className={`rounded-xl border overflow-hidden ${kwSearching ? 'border-yellow-300 bg-yellow-50/30' : !kw.is_active ? 'bg-gray-50 opacity-60' : 'bg-white'}`}>
                     {/* Keyword Row */}
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{kw.keyword}</span>
+                          <span className={`font-medium ${kw.is_active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{kw.keyword}</span>
+                          {!kw.is_active && (
+                            <span className="px-2 py-0.5 bg-gray-200 text-gray-500 rounded-full text-xs font-medium">제외</span>
+                          )}
                           {kwSearching && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
                               <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -660,6 +783,15 @@ export default function TikTokAnalyzerPage() {
                             }`}
                         >
                           {kwSearching ? '🔄 수집중...' : '▶ 검색'}
+                        </button>
+                        <button
+                          onClick={() => toggleKeywordActive(kw.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${kw.is_active
+                            ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            }`}
+                        >
+                          {kw.is_active ? '검색 제외' : '검색 포함'}
                         </button>
                         <button
                           onClick={() => deleteKeyword(kw.id)}
@@ -710,6 +842,202 @@ export default function TikTokAnalyzerPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Tab Content: Daily Report */}
+        {activeTab === 'daily' && (
+          <div>
+            {/* Compare Detail View */}
+            {compareData && (
+              <div className="bg-white rounded-2xl border shadow-sm p-5 mb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">
+                      &quot;{compareData.keyword}&quot; 전일 비교
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {compareData.previous_date} → {compareData.date}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-2 text-xs">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">당일 {compareData.today_count}개</span>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full">전일 {compareData.prev_count}개</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full">🆕 {compareData.new_entries}개</span>
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full">📤 {compareData.exited_count}개</span>
+                    </div>
+                    <button
+                      onClick={() => setCompareData(null)}
+                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600 transition"
+                    >
+                      ✕ 닫기
+                    </button>
+                  </div>
+                </div>
+
+                {/* Video Comparison Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="p-2 text-left font-medium text-gray-500 w-12">#</th>
+                        <th className="p-2 text-left font-medium text-gray-500">크리에이터</th>
+                        <th className="p-2 text-left font-medium text-gray-500 max-w-[200px]">설명</th>
+                        <th className="p-2 text-right font-medium text-gray-500">조회수</th>
+                        <th className="p-2 text-right font-medium text-gray-500">좋아요</th>
+                        <th className="p-2 text-center font-medium text-gray-500">변동</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compareData.videos.map((video) => (
+                        <tr key={video.id} className={`border-b hover:bg-gray-50 ${video.is_new ? 'bg-green-50/50' : ''}`}>
+                          <td className="p-2 font-mono text-gray-500">{video.rank}</td>
+                          <td className="p-2">
+                            <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">
+                              {video.creator_id}
+                            </a>
+                          </td>
+                          <td className="p-2 text-xs text-gray-600 max-w-[200px] truncate">{video.description}</td>
+                          <td className="p-2 text-right text-xs">
+                            {formatNumber(video.views)}
+                            {video.prev_views && video.prev_views !== video.views && (
+                              <span className="text-gray-400 ml-1">(전일 {formatNumber(video.prev_views)})</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-right text-xs">{formatNumber(video.likes)}</td>
+                          <td className="p-2 text-center">
+                            {video.is_new ? (
+                              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">🆕 NEW</span>
+                            ) : video.rank_change !== null && video.rank_change !== 0 ? (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${video.rank_change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {video.rank_change > 0 ? `▲${video.rank_change}` : `▼${Math.abs(video.rank_change)}`}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Exited Videos */}
+                {compareData.exited_videos.length > 0 && (
+                  <div className="mt-4 p-3 bg-red-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-red-700 mb-2">📤 이탈 영상 ({compareData.exited_videos.length}개)</h4>
+                    <div className="space-y-1">
+                      {compareData.exited_videos.map((video: any) => (
+                        <div key={video.id} className="flex items-center gap-3 text-xs text-red-600">
+                          <span className="font-mono">#{video.rank}</span>
+                          <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                            {video.creator_id}
+                          </a>
+                          <span className="text-red-400 truncate max-w-[300px]">{video.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Report Detail View */}
+            {selectedReport && !compareData && (
+              <div className="bg-white rounded-2xl border shadow-sm p-5 mb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">
+                      📅 {selectedReport.date} 리포트
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {selectedReport.total_keywords}개 키워드 · {selectedReport.total_videos}개 영상
+                      {selectedReport.has_previous && ' · 전일 비교 가능'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedReport(null)}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600 transition"
+                  >
+                    ✕ 목록으로
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedReport.searches.map((search) => (
+                    <div key={search.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-900">{search.keyword}</span>
+                        <span className="text-xs text-gray-500 ml-2">{search.video_count}개 영상</span>
+                        {search.analysis && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {typeof search.analysis === 'object' && search.analysis.summary ? search.analysis.summary : ''}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {search.has_previous ? (
+                          <button
+                            onClick={() => fetchCompare(selectedReport.date, search.keyword)}
+                            className="px-3 py-1.5 bg-[#1E9EDE] text-white rounded-lg text-xs font-medium hover:bg-[#1789c4] transition"
+                          >
+                            📊 전일 비교
+                          </button>
+                        ) : (
+                          <span className="px-3 py-1.5 bg-gray-200 text-gray-500 rounded-lg text-xs">전일 데이터 없음</span>
+                        )}
+                        <button
+                          onClick={() => fetchSearchDetail(search.id)}
+                          className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition"
+                        >
+                          상세 →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Report List */}
+            {!selectedReport && !compareData && (
+              <div>
+                {loadingReport ? (
+                  <div className="bg-white rounded-2xl border p-8 text-center text-gray-400">로딩 중...</div>
+                ) : dailyReports.length > 0 ? (
+                  <div className="space-y-2">
+                    {dailyReports.map((report) => (
+                      <button
+                        key={report.report_date}
+                        onClick={() => fetchReportDetail(report.report_date)}
+                        className="w-full flex items-center justify-between p-4 bg-white rounded-xl border hover:shadow-md hover:border-[#1E9EDE] transition text-left"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-[#0F172A] text-white rounded-xl flex flex-col items-center justify-center">
+                            <span className="text-xs font-bold">{new Date(report.report_date + 'T00:00:00').getMonth() + 1}월</span>
+                            <span className="text-lg font-bold leading-none">{new Date(report.report_date + 'T00:00:00').getDate()}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-900">{report.report_date}</span>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {report.keyword_count}개 키워드 · {report.total_videos}개 영상
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-gray-300 text-sm">→</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border p-8 text-center text-gray-400">
+                    <p className="text-lg mb-2">📅</p>
+                    <p>Daily Report가 없습니다</p>
+                    <p className="text-xs mt-1">n8n 스케줄러로 정기 실행하면 자동으로 생성됩니다</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
