@@ -77,7 +77,6 @@ export default function TikTokAnalyzerPage() {
   const [activeTasks, setActiveTasks] = useState<TaskStatus[]>([]);
   const [searchingKeywords, setSearchingKeywords] = useState<Set<string>>(new Set());
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const lastKeywordRefresh = useRef<number | null>(null);
 
   // Keyword history
   const [expandedKeyword, setExpandedKeyword] = useState<number | null>(null);
@@ -117,23 +116,12 @@ export default function TikTokAnalyzerPage() {
         if (tasks.length === 0 && pollingRef.current) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
-          // 완료 시 키워드 목록 갱신 (정렬 업데이트)
-          fetchKeywords();
-        }
-
-        // 진행 중일 때도 키워드 목록 갱신 (30초마다)
-        if (tasks.length > 0) {
-          const now = Date.now();
-          if (!lastKeywordRefresh.current || now - lastKeywordRefresh.current > 30000) {
-            lastKeywordRefresh.current = now;
-            fetchKeywords();
-          }
         }
       }
     } catch (err) {
       console.error('Failed to poll task status:', err);
     }
-  }, [fetchKeywords]);
+  }, []);
 
   const startPolling = useCallback(() => {
     if (pollingRef.current) return;
@@ -158,16 +146,7 @@ export default function TikTokAnalyzerPage() {
     try {
       const res = await fetch(`${API_URL}/api/tiktok/keywords`);
       const data = await res.json();
-      if (data.success) {
-        // 최근 수집된 키워드가 위로 오도록 정렬
-        const sorted = (data.data || []).sort((a: Keyword, b: Keyword) => {
-          if (!a.last_searched && !b.last_searched) return 0;
-          if (!a.last_searched) return 1;
-          if (!b.last_searched) return -1;
-          return new Date(b.last_searched).getTime() - new Date(a.last_searched).getTime();
-        });
-        setKeywords(sorted);
-      }
+      if (data.success) setKeywords(data.data || []);
     } catch (err) {
       console.error('Failed to fetch keywords:', err);
     }
@@ -385,26 +364,35 @@ export default function TikTokAnalyzerPage() {
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight">TikTok 광고 분석</h1>
               </div>
             </div>
-            <button
-              onClick={runAllKeywords}
-              disabled={isRunning}
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white rounded-xl font-semibold text-sm transition active:scale-95 disabled:cursor-not-allowed flex items-center gap-2 justify-center min-w-[180px]"
-            >
-              {isRunning ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  실행 중...
-                </>
-              ) : (
-                <>
-                  <span>🚀</span>
-                  전체 키워드 실행
-                </>
-              )}
-            </button>
+            {isRunning ? (
+              <button
+                onClick={async () => {
+                  try {
+                    await fetch(`${API_URL}/api/tiktok/tasks/cancel`, { method: 'POST' });
+                    setIsRunning(false);
+                    setSearchingKeywords(new Set());
+                    setActiveTasks([]);
+                    setRunMessage('⏹ 실행이 중단되었습니다.');
+                    setTimeout(() => setRunMessage(''), 5000);
+                  } catch {}
+                }}
+                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold text-sm transition active:scale-95 flex items-center gap-2 justify-center min-w-[180px]"
+              >
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                ⏹ 중단하기
+              </button>
+            ) : (
+              <button
+                onClick={runAllKeywords}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold text-sm transition active:scale-95 flex items-center gap-2 justify-center min-w-[180px]"
+              >
+                <span>🚀</span>
+                전체 키워드 실행
+              </button>
+            )}
           </div>
           <p className="text-white/60 text-sm mt-2">키워드 기반 TikTok 인기 콘텐츠 수집 · 분석 (TOP 30)</p>
 
