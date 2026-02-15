@@ -228,6 +228,155 @@ export default function AnalysisDetailPage() {
             </div>
           </div>
 
+          {/* ========== 핵심정보 요약 (productEssentials) ========== */}
+          {data.productEssentials && (
+            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+              <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center text-white text-xs">✦</span>
+                핵심정보 요약
+              </h3>
+
+              <div className="space-y-4 text-sm">
+                {/* 효능 포인트 */}
+                {data.productEssentials.efficacyPoints && data.productEssentials.efficacyPoints.length > 0 && (
+                  <div>
+                    {data.productEssentials.efficacyPoints.map((point: any, i: number) => (
+                      <div key={i} className="mb-3 last:mb-0">
+                        <div className="flex items-start gap-2">
+                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold flex-shrink-0">
+                            Point {point.pointNumber}
+                          </span>
+                          <div>
+                            <span className="font-bold text-slate-900">{point.headline}</span>
+                            {point.subCopy && (
+                              <span className="text-slate-500 ml-1">— {point.subCopy}</span>
+                            )}
+                          </div>
+                        </div>
+                        {point.details && point.details.length > 0 && (
+                          <div className="ml-14 mt-1 text-slate-600">
+                            {point.details.map((d: string, j: number) => (
+                              <div key={j}>· {d}</div>
+                            ))}
+                          </div>
+                        )}
+                        {point.clinicalNote && (
+                          <div className="ml-14 mt-1 text-blue-600 text-xs">
+                            📋 {point.clinicalNote}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 성분 상세 */}
+                {data.productEssentials.ingredientDetails && data.productEssentials.ingredientDetails.length > 0 && (
+                  <div className="border-t border-slate-100 pt-3">
+                    {data.productEssentials.ingredientDetails.map((system: any, i: number) => (
+                      <div key={i} className="mb-2 last:mb-0">
+                        {system.systemName && (
+                          <div className="font-bold text-slate-700 mb-1">{system.systemName}</div>
+                        )}
+                        {system.components && system.components.map((comp: any, j: number) => (
+                          <div key={j} className="ml-2 flex items-start gap-1 text-slate-600 mb-0.5">
+                            <span className="text-slate-400">·</span>
+                            <span>
+                              <span className="font-medium text-slate-800">{comp.role}</span>
+                              {comp.ingredient && (
+                                <span className="text-emerald-600 ml-1">({comp.ingredient})</span>
+                              )}
+                              {comp.description && (
+                                <span className="text-slate-500 ml-1">— {comp.description}</span>
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 주요 성분 */}
+                {data.productEssentials.keyIngredients && data.productEssentials.keyIngredients.length > 0 && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="font-bold text-slate-700 mb-1.5">주요 성분</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {data.productEssentials.keyIngredients.map((ing: any, i: number) => (
+                        <span key={i} className="px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs">
+                          <span className="font-medium text-amber-800">{ing.name}</span>
+                          <span className="text-amber-600 ml-1">({ing.benefit})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 사용법 */}
+                {data.productEssentials.howToUse && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="font-bold text-slate-700 mb-1">
+                      사용법
+                      {data.productEssentials.howToUse.summary && (
+                        <span className="font-normal text-slate-500 ml-1">— {data.productEssentials.howToUse.summary}</span>
+                      )}
+                    </div>
+                    {data.productEssentials.howToUse.steps && data.productEssentials.howToUse.steps.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {data.productEssentials.howToUse.steps.map((step: any, i: number) => (
+                          <div key={i} className="flex items-center gap-1 text-xs text-slate-600">
+                            <span className="w-5 h-5 bg-cyan-100 text-cyan-700 rounded flex items-center justify-center font-bold text-[10px]">
+                              {step.step || i + 1}
+                            </span>
+                            <span>{step.description}</span>
+                            {i < (data.productEssentials.howToUse.steps.length - 1) && (
+                              <span className="text-slate-300 ml-1">→</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 안전성 테스트 */}
+                {data.productEssentials.safetyTests && data.productEssentials.safetyTests.length > 0 && (
+                  <div className="border-t border-slate-100 pt-3">
+                    {data.productEssentials.safetyHeadline && (
+                      <div className="font-bold text-slate-700 mb-2">{data.productEssentials.safetyHeadline}</div>
+                    )}
+                    <div className="space-y-2">
+                      {data.productEssentials.safetyTests.map((test: any, i: number) => (
+                        <div key={i} className="bg-blue-50 rounded-lg p-2.5">
+                          <div className="font-medium text-blue-800">{test.testName}</div>
+                          <div className="text-blue-700 text-xs mt-0.5">{test.description}</div>
+                          <div className="text-blue-500 text-[11px] mt-1">
+                            {[test.institution, test.period, test.subjects].filter(Boolean).join(' / ')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 제형 정보 */}
+                {data.productEssentials.formulaInfo && (
+                  <div className="border-t border-slate-100 pt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                    {data.productEssentials.formulaInfo.pH && (
+                      <span>pH: <span className="text-slate-700 font-medium">{data.productEssentials.formulaInfo.pH}</span></span>
+                    )}
+                    {data.productEssentials.formulaInfo.texture && (
+                      <span>제형: <span className="text-slate-700 font-medium">{data.productEssentials.formulaInfo.texture}</span></span>
+                    )}
+                    {data.productEssentials.formulaInfo.keyFeature && (
+                      <span>특징: <span className="text-slate-700 font-medium">{data.productEssentials.formulaInfo.keyFeature}</span></span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 접기/펼치기 컨트롤 */}
           {blockAnalysisList.length > 0 && (
             <div className="flex items-center justify-between mb-4">
