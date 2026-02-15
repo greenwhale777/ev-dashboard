@@ -131,6 +131,7 @@ export interface AnalysisData {
   blockAnalysis?: BlockAnalysis[];
   segmentationPlan?: SegmentationPlan[];
   analysisMetadata?: AnalysisMetadata;
+  productEssentials?: any;
 }
 
 export interface AnalysisResult {
