@@ -452,11 +452,6 @@ export default function TikTokAnalyzerPage() {
     return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
-  const formatReportDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-  };
-
   const formatNumber = (val: string) => {
     if (!val || val === 'N/A') return '-';
     const num = parseInt(val);
@@ -954,7 +949,7 @@ export default function TikTokAnalyzerPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-bold text-lg text-gray-900">
-                      📅 {formatReportDate(selectedReport.date)} 리포트
+                      📅 {selectedReport.date} 리포트
                     </h3>
                     <p className="text-sm text-gray-500 mt-0.5">
                       {selectedReport.total_keywords}개 키워드 · {selectedReport.total_videos}개 영상
@@ -1020,11 +1015,11 @@ export default function TikTokAnalyzerPage() {
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-[#0F172A] text-white rounded-xl flex flex-col items-center justify-center">
-                            <span className="text-xs font-bold">{new Date(report.report_date).getMonth() + 1}월</span>
-                            <span className="text-lg font-bold leading-none">{new Date(report.report_date).getDate()}</span>
+                            <span className="text-xs font-bold">{new Date(report.report_date + 'T00:00:00').getMonth() + 1}월</span>
+                            <span className="text-lg font-bold leading-none">{new Date(report.report_date + 'T00:00:00').getDate()}</span>
                           </div>
                           <div>
-                            <span className="font-medium text-gray-900">{formatReportDate(report.report_date)}</span>
+                            <span className="font-medium text-gray-900">{report.report_date}</span>
                             <p className="text-xs text-gray-500 mt-0.5">
                               {report.keyword_count}개 키워드 · {report.total_videos}개 영상
                             </p>
