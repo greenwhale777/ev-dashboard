@@ -119,7 +119,9 @@ interface CompareVideo {
   prev_likes_num: number;
   views_change: number;
   likes_change: number;
+  comments_change: number;
   views_change_rate: number;
+  prev_comments: string | null;
 }
 
 // ============================================================
