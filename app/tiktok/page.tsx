@@ -945,7 +945,7 @@ export default function TikTokAnalyzerPage() {
                                       <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">
                                         @{video.creator_id}
                                       </a>
-                                      {video.is_new && <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">NEW</span>}
+                                      {video.is_new && <span className="text-green-600 font-bold text-sm">NEW</span>}
                                       {video.rank_change !== null && video.rank_change !== undefined && video.rank_change !== 0 && !video.is_new && (
                                         <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${video.rank_change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                           {video.rank_change > 0 ? `▲${video.rank_change}` : `▼${Math.abs(video.rank_change)}`}
@@ -1014,11 +1014,25 @@ export default function TikTokAnalyzerPage() {
                                     </div>
                                   )}
                                 </td>
-                                <td className="p-3 text-right text-xs">{formatNumber(video.likes)}</td>
-                                <td className="p-3 text-right text-xs">{formatNumber(video.comments)}</td>
+                                <td className="p-3 text-right text-xs">
+                                  <div>{formatNumber(video.likes)}</div>
+                                  {video.prev_likes && video.prev_likes !== video.likes && (
+                                    <div className={`text-xs ${video.likes_change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {video.likes_change > 0 ? '+' : ''}{formatNumber(video.likes_change.toString())}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-3 text-right text-xs">
+                                  <div>{formatNumber(video.comments)}</div>
+                                  {video.prev_comments && video.prev_comments !== video.comments && (
+                                    <div className={`text-xs ${video.comments_change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {video.comments_change > 0 ? '+' : ''}{formatNumber(video.comments_change.toString())}
+                                    </div>
+                                  )}
+                                </td>
                                 <td className="p-3 text-center">
                                   {video.is_new ? (
-                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">🆕</span>
+                                    <span className="text-green-600 font-bold text-sm">NEW</span>
                                   ) : video.rank_change !== null && video.rank_change !== 0 ? (
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${video.rank_change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                       {video.rank_change > 0 ? `▲${video.rank_change}` : `▼${Math.abs(video.rank_change)}`}
