@@ -85,8 +85,17 @@ interface CompareData {
   prev_count: number;
   new_entries: number;
   exited_count: number;
+  insights: Insight[];
   videos: CompareVideo[];
   exited_videos: any[];
+}
+
+interface Insight {
+  type: string;
+  icon: string;
+  label: string;
+  desc: string;
+  videos: any[];
 }
 
 interface CompareVideo {
@@ -104,6 +113,13 @@ interface CompareVideo {
   rank_change: number | null;
   prev_views: string | null;
   prev_likes: string | null;
+  views_num: number;
+  prev_views_num: number;
+  likes_num: number;
+  prev_likes_num: number;
+  views_change: number;
+  likes_change: number;
+  views_change_rate: number;
 }
 
 // ============================================================
@@ -148,6 +164,7 @@ export default function TikTokAnalyzerPage() {
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<DailyReportDetail | null>(null);
   const [compareData, setCompareData] = useState<CompareData | null>(null);
+  const [compareViewMode, setCompareViewMode] = useState<'insights' | 'today' | 'previous'>('insights');
   const [loadingReport, setLoadingReport] = useState(false);
 
   // ============================================================
@@ -855,93 +872,207 @@ export default function TikTokAnalyzerPage() {
           <div>
             {/* Compare Detail View */}
             {compareData && (
-              <div className="bg-white rounded-2xl border shadow-sm p-5 mb-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-bold text-lg text-gray-900">
-                      &quot;{compareData.keyword}&quot; 전일 비교
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      {compareData.previous_date} → {compareData.date}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-2 text-xs">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">당일 {compareData.today_count}개</span>
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full">전일 {compareData.prev_count}개</span>
-                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full">🆕 {compareData.new_entries}개</span>
-                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full">📤 {compareData.exited_count}개</span>
+              <div>
+                {/* Header */}
+                <div className="bg-white rounded-2xl border shadow-sm p-5 mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900">
+                        &quot;{compareData.keyword}&quot; 분석
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        {formatReportDate(compareData.previous_date)} → {formatReportDate(compareData.date)}
+                      </p>
                     </div>
                     <button
-                      onClick={() => setCompareData(null)}
+                      onClick={() => { setCompareData(null); setCompareViewMode('insights'); }}
                       className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600 transition"
                     >
-                      ✕ 닫기
+                      ✕ 키워드 목록으로
                     </button>
+                  </div>
+                  {/* Summary badges */}
+                  <div className="flex gap-2 flex-wrap text-xs">
+                    <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full">당일 {compareData.today_count}개</span>
+                    <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full">전일 {compareData.prev_count}개</span>
+                    <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full">🆕 신규 {compareData.new_entries}개</span>
+                    <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full">📤 이탈 {compareData.exited_count}개</span>
+                  </div>
+                  {/* View mode toggle */}
+                  <div className="flex gap-2 mt-4">
+                    {[
+                      { key: 'insights', label: '💡 특이사항' },
+                      { key: 'today', label: `📅 ${formatReportDate(compareData.date)}` },
+                      { key: 'previous', label: `📅 ${formatReportDate(compareData.previous_date)}` },
+                    ].map((mode) => (
+                      <button
+                        key={mode.key}
+                        onClick={() => setCompareViewMode(mode.key as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${compareViewMode === mode.key
+                          ? 'bg-[#0F172A] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Video Comparison Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="p-2 text-left font-medium text-gray-500 w-12">#</th>
-                        <th className="p-2 text-left font-medium text-gray-500">크리에이터</th>
-                        <th className="p-2 text-left font-medium text-gray-500 max-w-[200px]">설명</th>
-                        <th className="p-2 text-right font-medium text-gray-500">조회수</th>
-                        <th className="p-2 text-right font-medium text-gray-500">좋아요</th>
-                        <th className="p-2 text-center font-medium text-gray-500">변동</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compareData.videos.map((video) => (
-                        <tr key={video.id} className={`border-b hover:bg-gray-50 ${video.is_new ? 'bg-green-50/50' : ''}`}>
-                          <td className="p-2 font-mono text-gray-500">{video.rank}</td>
-                          <td className="p-2">
-                            <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">
-                              {video.creator_id}
-                            </a>
-                          </td>
-                          <td className="p-2 text-xs text-gray-600 max-w-[200px] truncate">{video.description}</td>
-                          <td className="p-2 text-right text-xs">
-                            {formatNumber(video.views)}
-                            {video.prev_views && video.prev_views !== video.views && (
-                              <span className="text-gray-400 ml-1">(전일 {formatNumber(video.prev_views)})</span>
-                            )}
-                          </td>
-                          <td className="p-2 text-right text-xs">{formatNumber(video.likes)}</td>
-                          <td className="p-2 text-center">
-                            {video.is_new ? (
-                              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">🆕 NEW</span>
-                            ) : video.rank_change !== null && video.rank_change !== 0 ? (
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${video.rank_change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {video.rank_change > 0 ? `▲${video.rank_change}` : `▼${Math.abs(video.rank_change)}`}
-                              </span>
-                            ) : (
-                              <span className="text-gray-300 text-xs">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Exited Videos */}
-                {compareData.exited_videos.length > 0 && (
-                  <div className="mt-4 p-3 bg-red-50 rounded-lg">
-                    <h4 className="text-sm font-medium text-red-700 mb-2">📤 이탈 영상 ({compareData.exited_videos.length}개)</h4>
-                    <div className="space-y-1">
-                      {compareData.exited_videos.map((video: any) => (
-                        <div key={video.id} className="flex items-center gap-3 text-xs text-red-600">
-                          <span className="font-mono">#{video.rank}</span>
-                          <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                            {video.creator_id}
-                          </a>
-                          <span className="text-red-400 truncate max-w-[300px]">{video.description}</span>
+                {/* Insights View */}
+                {compareViewMode === 'insights' && (
+                  <div className="space-y-4">
+                    {compareData.insights && compareData.insights.length > 0 ? (
+                      compareData.insights.map((insight, idx) => (
+                        <div key={idx} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
+                          insight.type === 'hot_new' || insight.type === 'rank_up' || insight.type === 'views_spike' 
+                            ? 'border-l-4 border-l-green-400' 
+                            : 'border-l-4 border-l-red-400'
+                        }`}>
+                          <div className="p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="text-xl">{insight.icon}</span>
+                              <h4 className="font-bold text-gray-900">{insight.label}</h4>
+                              <span className="text-xs text-gray-500">— {insight.desc}</span>
+                              <span className="ml-auto px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">{insight.videos.length}개</span>
+                            </div>
+                            <div className="space-y-2">
+                              {insight.videos.map((video: any) => (
+                                <div key={video.id || video.video_url} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                                  <span className="text-sm font-mono font-bold text-gray-400 w-8">#{video.rank}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">
+                                        @{video.creator_id}
+                                      </a>
+                                      {video.is_new && <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">NEW</span>}
+                                      {video.rank_change !== null && video.rank_change !== undefined && video.rank_change !== 0 && !video.is_new && (
+                                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${video.rank_change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                          {video.rank_change > 0 ? `▲${video.rank_change}` : `▼${Math.abs(video.rank_change)}`}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-500 truncate mt-0.5">{video.description}</p>
+                                  </div>
+                                  <div className="text-right text-xs whitespace-nowrap">
+                                    <div className="text-gray-700">{formatNumber(video.views || video.views_num?.toString())} views</div>
+                                    {video.views_change_rate > 0 && (
+                                      <div className="text-green-600 font-medium">+{video.views_change_rate}%</div>
+                                    )}
+                                    {video.prev_views && (
+                                      <div className="text-gray-400">전일 {formatNumber(video.prev_views)}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      ))}
+                      ))
+                    ) : (
+                      <div className="bg-white rounded-2xl border p-8 text-center text-gray-400">
+                        <p className="text-lg mb-2">✅</p>
+                        <p>특이사항 없음</p>
+                        <p className="text-xs mt-1">전일 대비 큰 변동이 없습니다</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Today / Previous Data View */}
+                {(compareViewMode === 'today' || compareViewMode === 'previous') && (
+                  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-gray-50">
+                            <th className="p-3 text-left font-medium text-gray-500 w-12">#</th>
+                            <th className="p-3 text-left font-medium text-gray-500">크리에이터</th>
+                            <th className="p-3 text-left font-medium text-gray-500 max-w-[250px]">설명</th>
+                            <th className="p-3 text-right font-medium text-gray-500">조회수</th>
+                            <th className="p-3 text-right font-medium text-gray-500">좋아요</th>
+                            <th className="p-3 text-right font-medium text-gray-500">댓글</th>
+                            <th className="p-3 text-center font-medium text-gray-500">변동</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {compareViewMode === 'today' ? (
+                            compareData.videos.map((video) => (
+                              <tr key={video.id} className={`border-b hover:bg-gray-50 ${video.is_new ? 'bg-green-50/50' : ''}`}>
+                                <td className="p-3 font-mono text-gray-500 font-bold">{video.rank}</td>
+                                <td className="p-3">
+                                  <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs font-medium">
+                                    @{video.creator_id}
+                                  </a>
+                                </td>
+                                <td className="p-3 text-xs text-gray-600 max-w-[250px] truncate">{video.description}</td>
+                                <td className="p-3 text-right text-xs">
+                                  <div>{formatNumber(video.views)}</div>
+                                  {video.prev_views && video.prev_views !== video.views && (
+                                    <div className={`text-xs ${video.views_change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {video.views_change > 0 ? '+' : ''}{formatNumber(video.views_change.toString())}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-3 text-right text-xs">{formatNumber(video.likes)}</td>
+                                <td className="p-3 text-right text-xs">{formatNumber(video.comments)}</td>
+                                <td className="p-3 text-center">
+                                  {video.is_new ? (
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">🆕</span>
+                                  ) : video.rank_change !== null && video.rank_change !== 0 ? (
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${video.rank_change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      {video.rank_change > 0 ? `▲${video.rank_change}` : `▼${Math.abs(video.rank_change)}`}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-300 text-xs">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            compareData.exited_videos.concat(
+                              compareData.videos.filter(v => !v.is_new).sort((a, b) => (a.prev_rank || 99) - (b.prev_rank || 99))
+                            ).length > 0 ? (
+                              // 전일 데이터: 전일 순위 기준으로 정렬
+                              [...compareData.videos.filter(v => !v.is_new).map(v => ({
+                                ...v,
+                                display_rank: v.prev_rank,
+                                display_views: v.prev_views || v.views,
+                                display_likes: v.prev_likes || v.likes,
+                                still_in: true,
+                              })), ...compareData.exited_videos.map((v: any) => ({
+                                ...v,
+                                display_rank: v.rank,
+                                display_views: v.views,
+                                display_likes: v.likes,
+                                still_in: false,
+                              }))].sort((a, b) => (a.display_rank || 99) - (b.display_rank || 99)).map((video: any) => (
+                                <tr key={video.id || video.video_url} className={`border-b hover:bg-gray-50 ${!video.still_in ? 'bg-red-50/50' : ''}`}>
+                                  <td className="p-3 font-mono text-gray-500 font-bold">{video.display_rank}</td>
+                                  <td className="p-3">
+                                    <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs font-medium">
+                                      @{video.creator_id}
+                                    </a>
+                                  </td>
+                                  <td className="p-3 text-xs text-gray-600 max-w-[250px] truncate">{video.description}</td>
+                                  <td className="p-3 text-right text-xs">{formatNumber(video.display_views)}</td>
+                                  <td className="p-3 text-right text-xs">{formatNumber(video.display_likes)}</td>
+                                  <td className="p-3 text-right text-xs">—</td>
+                                  <td className="p-3 text-center">
+                                    {!video.still_in ? (
+                                      <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">📤 이탈</span>
+                                    ) : (
+                                      <span className="text-gray-300 text-xs">유지</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr><td colSpan={7} className="p-8 text-center text-gray-400">전일 데이터가 없습니다</td></tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
@@ -971,33 +1102,24 @@ export default function TikTokAnalyzerPage() {
 
                 <div className="space-y-2">
                   {selectedReport.searches.map((search) => (
-                    <div key={search.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <div key={search.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
                       <div className="flex-1">
-                        <span className="font-medium text-gray-900">{search.keyword}</span>
-                        <span className="text-xs text-gray-500 ml-2">{search.video_count}개 영상</span>
-                        {search.analysis && (
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {typeof search.analysis === 'object' && search.analysis.summary ? search.analysis.summary : ''}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-900">{search.keyword}</span>
+                          <span className="text-xs text-gray-500">{search.video_count}개 영상</span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {search.has_previous ? (
                           <button
-                            onClick={() => fetchCompare(selectedReport.date, search.keyword)}
-                            className="px-3 py-1.5 bg-[#1E9EDE] text-white rounded-lg text-xs font-medium hover:bg-[#1789c4] transition"
+                            onClick={() => { fetchCompare(selectedReport.date, search.keyword); setCompareViewMode('insights'); }}
+                            className="px-4 py-2 bg-[#0F172A] text-white rounded-lg text-xs font-medium hover:bg-[#1e293b] transition"
                           >
-                            📊 전일 비교
+                            💡 분석 보기
                           </button>
                         ) : (
                           <span className="px-3 py-1.5 bg-gray-200 text-gray-500 rounded-lg text-xs">전일 데이터 없음</span>
                         )}
-                        <button
-                          onClick={() => fetchSearchDetail(search.id)}
-                          className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition"
-                        >
-                          상세 →
-                        </button>
                       </div>
                     </div>
                   ))}
