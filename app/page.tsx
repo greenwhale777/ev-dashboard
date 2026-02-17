@@ -1,464 +1,669 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-// API 서버 URL
-const API_URL = process.env.NEXT_PUBLIC_EV0_API_URL || 'https://ev0-agent-production.up.railway.app';
+// EV3 Accounting API 서버
+const API_URL = process.env.NEXT_PUBLIC_EV3_API_URL || 'https://ev3-accounting-production.up.railway.app';
+
+// ============ 타입 ============
+interface AccountMapping {
+  id: number;
+  priority: number;
+  source_type: 'memo' | 'merchant' | 'trading_party';
+  match_value: string;
+  match_type: 'includes' | 'exact' | 'startsWith';
+  case_sensitive: boolean;
+  account_code: string;
+  account_name: string;
+  vendor_code: string;
+  vendor_name: string;
+  voucher_type: 'general' | 'purchase' | 'both';
+  is_active: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface ExecutionLog {
-  botId: string;
-  botName: string;
-  status: string;
-  startTime: string;
-  endTime: string;
+  id: number;
+  bot_id: string;
+  bot_name: string;
+  status: 'SUCCESS' | 'ERROR' | 'RUNNING';
+  start_time: string;
+  end_time: string;
   duration: string;
   message: string;
-  result?: {
-    match?: boolean;
-    clobeBalance?: number;
-    ecountBalance?: number;
-    difference?: number;
-  };
+  result: Record<string, unknown>;
 }
 
-// 봇 설정
-const botConfigs = {
-  ev0: {
-    title: 'EV0 - 중앙 관리',
-    icon: '🎯',
-    color: '#1E9EDE',
-    bots: []
-  },
-  ev1: {
-    title: 'EV1 - 재고 관리',
-    icon: '📦',
-    color: '#10B981',
-    bots: [],
-    comingSoon: true
-  },
-  ev2: {
-    title: 'EV2 - 생산성 봇',
-    icon: '🔍',
-    color: '#3B82F6',
-    bots: [
-      {
-        id: 'oliveyoung',
-        name: '올리브영 스크래퍼',
-        schedule: '매주 월요일 09:00',
-        hasManualRun: true,
-        command: '/run 올리브영'
-      },
-      {
-        id: 'page-analyzer',
-        name: '상세페이지 분석',
-        schedule: '수동 실행',
-        hasManualRun: true,
-        link: '/ev2'
-      },
-      {
-        id: 'tiktok-analyzer',
-        name: 'TikTok 광고 분석',
-        schedule: '매일 10:00',
-        hasManualRun: false,
-        link: '/tiktok'
-      }
-    ]
-  },
-  ev3: {
-    title: 'EV3 - 백오피스',
-    icon: '💼',
-    color: '#8B5CF6',
-    bots: [
-      {
-        id: 'accounting',
-        name: '회계전표 업로드',
-        schedule: '매주 수요일 12:00',
-        hasManualRun: true,
-        command: '/run 회계'
-      },
-      {
-        id: 'cash-bot',
-        name: '캐시 잔액 확인',
-        schedule: '매일 08:00',
-        hasManualRun: true,
-        command: '/run 캐시'
-      }
-    ]
-  }
+type TabType = 'logs' | 'mappings';
+type ModalMode = 'add' | 'edit';
+
+// ============ 유틸리티 ============
+const SOURCE_LABELS: Record<string, string> = {
+  memo: '메모 (W열/Q열)',
+  merchant: '거래처명 (G열)',
+  trading_party: '거래자명 (K열)',
 };
 
-// 상태 뱃지
-function getStatusBadge(status: string | undefined) {
-  if (status === 'SUCCESS') return { label: '성공', bg: 'bg-emerald-50', text: 'text-emerald-600' };
-  if (status === 'ERROR') return { label: '실패', bg: 'bg-red-50', text: 'text-red-600' };
-  return { label: '대기', bg: 'bg-slate-100', text: 'text-slate-500' };
+const VOUCHER_LABELS: Record<string, string> = {
+  general: '일반전표',
+  purchase: '매입전표',
+  both: '공통',
+};
+
+function formatTime(iso: string | undefined) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const h = d.getHours().toString().padStart(2, '0');
+  const min = d.getMinutes().toString().padStart(2, '0');
+  return `${m}/${day} ${h}:${min}`;
 }
 
-// 시간 포맷
-function formatTime(isoString: string | undefined) {
-  if (!isoString) return '-';
-  const date = new Date(isoString);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${month}/${day} ${hours}:${minutes}`;
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+    SUCCESS: { label: '성공', bg: 'bg-emerald-900/30', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+    ERROR: { label: '실패', bg: 'bg-red-900/30', text: 'text-red-400', dot: 'bg-red-400' },
+    RUNNING: { label: '실행 중', bg: 'bg-amber-900/30', text: 'text-amber-400', dot: 'bg-amber-400' },
+  };
+  const c = config[status] || config.ERROR;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${c.bg} ${c.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} ${status === 'RUNNING' ? 'animate-pulse' : ''}`} />
+      {c.label}
+    </span>
+  );
 }
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'ev0' | 'ev1' | 'ev2' | 'ev3'>('ev2');
+// ============ 메인 컴포넌트 ============
+export default function AccountingPage() {
+  const [tab, setTab] = useState<TabType>('logs');
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
-  const [botStatus, setBotStatus] = useState<Record<string, ExecutionLog>>({});
+  const [mappings, setMappings] = useState<AccountMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [triggering, setTriggering] = useState(false);
+  const [triggerResult, setTriggerResult] = useState<string | null>(null);
 
-  const fetchLogs = async () => {
+  // 매핑 필터
+  const [filterVoucherType, setFilterVoucherType] = useState<string>('all');
+  const [filterSourceType, setFilterSourceType] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 모달
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>('add');
+  const [editingMapping, setEditingMapping] = useState<AccountMapping | null>(null);
+  const [formData, setFormData] = useState({
+    priority: 2,
+    source_type: 'merchant' as 'memo' | 'merchant' | 'trading_party',
+    match_value: '',
+    match_type: 'includes' as 'includes' | 'exact' | 'startsWith',
+    case_sensitive: true,
+    account_code: '',
+    account_name: '',
+    vendor_code: '',
+    vendor_name: '',
+    voucher_type: 'both' as 'general' | 'purchase' | 'both',
+    notes: '',
+  });
+
+  // ============ 데이터 로드 ============
+  const fetchData = useCallback(async () => {
     try {
       setApiError(null);
-      const logsRes = await fetch(`${API_URL}/api/logs`);
-      const logsData = await logsRes.json();
-      setLogs(logsData);
-
-      const statusRes = await fetch(`${API_URL}/api/status`);
-      if (!statusRes.ok) throw new Error('상태 조회 실패');
-      const statusData = await statusRes.json();
-      setBotStatus(statusData);
-
-      setLastUpdate(new Date());
+      const [logsRes, mappingsRes] = await Promise.all([
+        fetch(`${API_URL}/api/logs?limit=50`),
+        fetch(`${API_URL}/api/mappings`),
+      ]);
+      if (logsRes.ok) setLogs(await logsRes.json());
+      if (mappingsRes.ok) setMappings(await mappingsRes.json());
       setLoading(false);
     } catch (e) {
       console.error('API 오류:', e);
-      setApiError('API 서버에 연결할 수 없습니다.');
+      setApiError('EV3 API 서버에 연결할 수 없습니다.');
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // ============ 수동 실행 ============
+  const handleTrigger = async () => {
+    setTriggering(true);
+    setTriggerResult(null);
+    try {
+      const res = await fetch(`${API_URL}/api/trigger/accounting`, { method: 'POST' });
+      const data = await res.json();
+      setTriggerResult(data.triggered ? '✅ 실행 요청 전송 완료' : '⚠️ ' + data.message);
+      setTimeout(() => fetchData(), 3000);
+    } catch {
+      setTriggerResult('❌ 실행 요청 실패');
+    } finally {
+      setTriggering(false);
+      setTimeout(() => setTriggerResult(null), 5000);
     }
   };
 
-  useEffect(() => {
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // ============ 매핑 CRUD ============
+  const openAddModal = () => {
+    setModalMode('add');
+    setEditingMapping(null);
+    setFormData({
+      priority: 2, source_type: 'merchant', match_value: '', match_type: 'includes',
+      case_sensitive: true, account_code: '', account_name: '', vendor_code: '',
+      vendor_name: '', voucher_type: 'both', notes: '',
+    });
+    setShowModal(true);
+  };
 
-  const currentConfig = botConfigs[activeTab];
+  const openEditModal = (m: AccountMapping) => {
+    setModalMode('edit');
+    setEditingMapping(m);
+    setFormData({
+      priority: m.priority,
+      source_type: m.source_type,
+      match_value: m.match_value,
+      match_type: m.match_type,
+      case_sensitive: m.case_sensitive,
+      account_code: m.account_code,
+      account_name: m.account_name,
+      vendor_code: m.vendor_code,
+      vendor_name: m.vendor_name,
+      voucher_type: m.voucher_type,
+      notes: m.notes || '',
+    });
+    setShowModal(true);
+  };
 
+  const handleSave = async () => {
+    if (!formData.match_value || !formData.account_code) {
+      alert('입력값과 계정코드는 필수입니다.');
+      return;
+    }
+    try {
+      if (modalMode === 'add') {
+        await fetch(`${API_URL}/api/mappings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+      } else if (editingMapping) {
+        await fetch(`${API_URL}/api/mappings/${editingMapping.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+      }
+      setShowModal(false);
+      fetchData();
+    } catch {
+      alert('저장 실패');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('삭제하시겠습니까?')) return;
+    try {
+      await fetch(`${API_URL}/api/mappings/${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch {
+      alert('삭제 실패');
+    }
+  };
+
+  const handleToggleActive = async (m: AccountMapping) => {
+    try {
+      await fetch(`${API_URL}/api/mappings/${m.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !m.is_active }),
+      });
+      fetchData();
+    } catch {
+      alert('상태 변경 실패');
+    }
+  };
+
+  // ============ 필터링 ============
+  const filteredMappings = mappings.filter(m => {
+    if (filterVoucherType !== 'all' && m.voucher_type !== filterVoucherType && m.voucher_type !== 'both') return false;
+    if (filterSourceType !== 'all' && m.source_type !== filterSourceType) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return m.match_value.toLowerCase().includes(q) ||
+        m.account_code.includes(q) ||
+        m.account_name.toLowerCase().includes(q) ||
+        m.vendor_code.includes(q);
+    }
+    return true;
+  });
+
+  const memoMappings = filteredMappings.filter(m => m.source_type === 'memo');
+  const merchantMappings = filteredMappings.filter(m => m.source_type !== 'memo');
+
+  // ============ 렌더링 ============
   return (
     <>
       <style jsx global>{`
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
         * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+        code, .font-mono { font-family: 'JetBrains Mono', monospace !important; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        
+        @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.25s ease-out; }
+
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 2px; }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-[#0B0D11] text-slate-200">
         {/* 헤더 */}
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+        <header className="bg-[#0F1117]/80 backdrop-blur-xl border-b border-white/[0.06] sticky top-0 z-30">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">EV</span>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900">EV System Dashboard</h1>
-                  <p className="text-sm text-slate-500">ASCENDERZ Elevator Framework</p>
+              <div className="flex items-center gap-4">
+                <a href="/" className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                  <span className="text-sm">대시보드</span>
+                </a>
+                <div className="w-px h-5 bg-white/10" />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-purple-800 rounded-lg flex items-center justify-center shadow-lg shadow-violet-900/30">
+                    <span className="text-white text-sm font-bold">E3</span>
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-bold text-white">회계전표 업로드</h1>
+                    <p className="text-xs text-slate-500">EV3 · 백오피스 자동화</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                {lastUpdate && (
-                  <span className="text-xs text-slate-400">
-                    마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR')}
-                  </span>
+
+              <div className="flex items-center gap-3">
+                {triggerResult && (
+                  <span className="text-sm text-slate-300 animate-fade-in">{triggerResult}</span>
                 )}
                 <button
-                  onClick={fetchLogs}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-all cursor-pointer active:scale-95"
+                  onClick={handleTrigger}
+                  disabled={triggering}
+                  className="group relative px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-900/40 hover:shadow-violet-800/50"
                 >
-                  🔄 새로고침
+                  {triggering ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      실행 중...
+                    </span>
+                  ) : '▶ 수동 실행'}
                 </button>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-6 pt-6 pb-8">
+        <main className="max-w-7xl mx-auto px-6 pt-6 pb-12">
           {apiError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div className="flex items-center gap-2 text-red-600">
+            <div className="mb-6 p-4 bg-red-900/20 border border-red-800/40 rounded-xl animate-fade-in">
+              <div className="flex items-center gap-2 text-red-400">
                 <span>⚠️</span>
-                <span className="font-medium">{apiError}</span>
+                <span className="font-medium text-sm">{apiError}</span>
               </div>
             </div>
           )}
 
-          {/* EV 모듈 탭 */}
-          <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
-            {Object.entries(botConfigs).map(([key, config]) => (
+          {/* 탭 */}
+          <div className="flex gap-1 mb-6 bg-[#13151B] rounded-xl p-1 w-fit">
+            {([
+              { key: 'logs', label: '실행 로그', icon: '📋' },
+              { key: 'mappings', label: '계정과목 매핑', icon: '🗂️' },
+            ] as { key: TabType; label: string; icon: string }[]).map(t => (
               <button
-                key={key}
-                onClick={() => setActiveTab(key as any)}
-                style={{
-                  backgroundColor: activeTab === key ? config.color : '#E2E8F0',
-                  color: activeTab === key ? '#FFFFFF' : '#475569',
-                  borderColor: activeTab === key ? config.color : 'transparent',
-                }}
-                className="px-5 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-95 border-2 whitespace-nowrap flex items-center gap-2"
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center gap-2 ${
+                  tab === t.key
+                    ? 'bg-violet-600/20 text-violet-300 shadow-inner'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+                }`}
               >
-                <span>{config.icon}</span>
-                <span>{config.title.split(' - ')[0]}</span>
-                {'comingSoon' in config && config.comingSoon && (
-                  <span className="text-xs bg-white/30 px-2 py-0.5 rounded">개발 중</span>
-                )}
+                <span>{t.icon}</span>
+                {t.label}
               </button>
             ))}
           </div>
 
-          {/* EV0 - 중앙 관리 */}
-          {activeTab === 'ev0' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="text-3xl">{currentConfig.icon}</span>
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
-                    <div className="text-sm text-blue-600 font-medium">전체 실행</div>
-                    <div className="text-2xl font-bold text-blue-900 mt-1">{logs.length}</div>
-                  </div>
-                  <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl">
-                    <div className="text-sm text-emerald-600 font-medium">성공</div>
-                    <div className="text-2xl font-bold text-emerald-900 mt-1">
-                      {logs.filter(l => l.status === 'SUCCESS').length}
+          {/* ============ 실행 로그 탭 ============ */}
+          {tab === 'logs' && (
+            <div className="space-y-4 animate-fade-in">
+              {/* 요약 카드 */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {[
+                  { label: '전체 실행', value: logs.length, color: 'from-slate-800 to-slate-900', border: 'border-slate-700/50' },
+                  { label: '성공', value: logs.filter(l => l.status === 'SUCCESS').length, color: 'from-emerald-900/40 to-emerald-950/40', border: 'border-emerald-800/30' },
+                  { label: '실패', value: logs.filter(l => l.status === 'ERROR').length, color: 'from-red-900/40 to-red-950/40', border: 'border-red-800/30' },
+                  { label: '마지막 실행', value: logs[0] ? formatTime(logs[0].end_time || logs[0].start_time) : '-', color: 'from-violet-900/30 to-violet-950/30', border: 'border-violet-800/30', isText: true },
+                ].map((card, i) => (
+                  <div key={i} className={`p-4 bg-gradient-to-br ${card.color} rounded-xl border ${card.border}`}>
+                    <div className="text-xs text-slate-400 mb-1">{card.label}</div>
+                    <div className={`font-bold ${('isText' in card && card.isText) ? 'text-base text-slate-200' : 'text-2xl text-white'}`}>
+                      {card.value}
                     </div>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl">
-                    <div className="text-sm text-red-600 font-medium">실패</div>
-                    <div className="text-2xl font-bold text-red-900 mt-1">
-                      {logs.filter(l => l.status === 'ERROR').length}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {loading ? (
-                      <div className="text-center py-8 text-slate-400">로딩 중...</div>
-                    ) : logs.length === 0 ? (
-                      <div className="text-center py-8 text-slate-400">실행 기록이 없습니다</div>
-                    ) : (
-                      logs.slice(0, 30).map((log, i) => (
-                        <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                          <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                            {log.status === 'SUCCESS' ? '성공' : '실패'}
-                          </span>
-                          <span className="font-semibold text-[#1E9EDE]">[{log.botName}]</span>
-                          <span className="text-slate-700 truncate flex-1">{log.message}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
-            </div>
-          )}
 
-          {/* EV1 - 재고 관리 (개발 중) */}
-          {activeTab === 'ev1' && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 shadow-sm text-center">
-              <div className="text-6xl mb-4">{currentConfig.icon}</div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">{currentConfig.title}</h2>
-              <p className="text-slate-500 mb-6">재고 수불부, 발주 알림, 이벤트 관리 기능 개발 중입니다.</p>
-              <div className="inline-block px-4 py-2 bg-slate-100 rounded-lg text-sm text-slate-600">
-                🚧 Coming Soon
-              </div>
-            </div>
-          )}
-
-          {/* EV2 - 생산성 봇 */}
-          {activeTab === 'ev2' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="text-3xl">{currentConfig.icon}</span>
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
-                    <p className="text-sm text-slate-500">데이터 수집 및 분석 자동화</p>
-                  </div>
+              {/* 로그 리스트 */}
+              <div className="bg-[#13151B] rounded-2xl border border-white/[0.06] overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/[0.06]">
+                  <h3 className="text-base font-bold text-white">실행 기록</h3>
                 </div>
-
-                <div className="space-y-4">
-                  {currentConfig.bots.map((bot) => {
-                    const status = botStatus[bot.id];
-                    const badge = getStatusBadge(status?.status);
-                    return (
-                      <div key={bot.id} className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="text-lg font-bold text-slate-900">{bot.name}</h3>
-                            <p className="text-sm text-slate-500 mt-1">
-                              ⏰ {bot.schedule}
-                            </p>
-                          </div>
-                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${badge.bg} ${badge.text}`}>
-                            {badge.label}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm">
-                            <span className="text-slate-400">마지막 실행:</span>
-                            <span className="text-slate-700 font-medium ml-2">{formatTime(status?.endTime)}</span>
-                          </div>
-                          {'link' in bot && bot.link ? (
-                            <a
-                              href={bot.link}
-                              className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95 inline-block"
-                            >
-                              ▶ 실행
-                            </a>
-                          ) : bot.hasManualRun && (
-                            <button
-                              className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-lg transition-all active:scale-95"
-                            >
-                              ▶ 실행
-                            </button>
-                          )}
-                        </div>
-
-                        {status?.message && (
-                          <div className="mt-3 p-3 bg-slate-100 rounded-lg">
-                            <p className="text-xs text-slate-600">{status.message}</p>
-                          </div>
+                <div className="max-h-[520px] overflow-y-auto scrollbar-thin">
+                  {loading ? (
+                    <div className="text-center py-12 text-slate-500">불러오는 중...</div>
+                  ) : logs.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">실행 기록이 없습니다</div>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div
+                        key={log.id || i}
+                        className="flex items-center gap-4 px-6 py-3.5 border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
+                        style={{ animationDelay: `${i * 30}ms` }}
+                      >
+                        <span className="text-xs text-slate-500 w-20 flex-shrink-0 font-mono">
+                          {formatTime(log.end_time || log.start_time)}
+                        </span>
+                        <StatusBadge status={log.status} />
+                        <span className="text-sm font-semibold text-violet-400 flex-shrink-0">[{log.bot_name}]</span>
+                        <span className="text-sm text-slate-400 truncate flex-1">{log.message}</span>
+                        {log.duration && (
+                          <span className="text-xs text-slate-600 flex-shrink-0 font-mono">{log.duration}</span>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">📋 EV2 실행 로그</h3>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {logs.filter(log => log.botId === 'oliveyoung' || log.botId === 'page-analyzer' || log.botId === 'tiktok-analyzer').slice(0, 15).map((log, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg">
-                      <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                        {log.status === 'SUCCESS' ? '성공' : '실패'}
-                      </span>
-                      <span className="font-semibold text-[#3B82F6]">[{log.botName}]</span>
-                      <span className="text-slate-700 truncate flex-1">{log.message}</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* EV3 - 백오피스 */}
-          {activeTab === 'ev3' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="text-3xl">{currentConfig.icon}</span>
+          {/* ============ 계정과목 매핑 탭 ============ */}
+          {tab === 'mappings' && (
+            <div className="space-y-5 animate-fade-in">
+              {/* 필터 바 */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-[200px]">
+                  <input
+                    type="text"
+                    placeholder="입력값, 계정코드, 계정명 검색..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#13151B] border border-white/[0.08] rounded-xl text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-600/50 focus:ring-1 focus:ring-violet-600/20 transition-all"
+                  />
+                </div>
+                <select
+                  value={filterVoucherType}
+                  onChange={e => setFilterVoucherType(e.target.value)}
+                  className="px-4 py-2.5 bg-[#13151B] border border-white/[0.08] rounded-xl text-sm text-slate-300 focus:outline-none focus:border-violet-600/50 cursor-pointer"
+                >
+                  <option value="all">전표유형: 전체</option>
+                  <option value="general">일반전표</option>
+                  <option value="purchase">매입전표</option>
+                </select>
+                <select
+                  value={filterSourceType}
+                  onChange={e => setFilterSourceType(e.target.value)}
+                  className="px-4 py-2.5 bg-[#13151B] border border-white/[0.08] rounded-xl text-sm text-slate-300 focus:outline-none focus:border-violet-600/50 cursor-pointer"
+                >
+                  <option value="all">매칭소스: 전체</option>
+                  <option value="memo">메모 (W/Q열)</option>
+                  <option value="merchant">거래처명 (G열)</option>
+                  <option value="trading_party">거래자명 (K열)</option>
+                </select>
+                <button
+                  onClick={openAddModal}
+                  className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-all cursor-pointer active:scale-95 shadow-lg shadow-violet-900/30 flex items-center gap-2"
+                >
+                  <span className="text-lg leading-none">+</span> 매핑 추가
+                </button>
+              </div>
+
+              {/* 안내 */}
+              <div className="p-4 bg-violet-900/10 border border-violet-800/20 rounded-xl">
+                <p className="text-xs text-violet-300/70 leading-relaxed">
+                  <strong className="text-violet-300">매핑 우선순위:</strong> 1순위(메모 W/Q열) → 2순위(거래처명/거래자명) → 기본값(8489 잡비). 
+                  여기서 수정한 매핑은 n8n 실행 시 자동으로 반영됩니다. 로컬 JS 파일 수정 불필요.
+                </p>
+              </div>
+
+              {/* 1순위: 메모 기반 */}
+              {memoMappings.length > 0 && (
+                <MappingSection
+                  title="1순위 — 메모 기반 매핑 (W열/Q열)"
+                  subtitle="카드 메모 또는 은행 메모에서 키워드가 매칭되면 적용"
+                  mappings={memoMappings}
+                  onEdit={openEditModal}
+                  onDelete={handleDelete}
+                  onToggle={handleToggleActive}
+                />
+              )}
+
+              {/* 2순위: 거래처 기반 */}
+              {merchantMappings.length > 0 && (
+                <MappingSection
+                  title="2순위 — 거래처/거래자 기반 매핑"
+                  subtitle="거래처명(G열), 거래자명(K열), 적요(J열)에서 키워드가 매칭되면 적용"
+                  mappings={merchantMappings}
+                  onEdit={openEditModal}
+                  onDelete={handleDelete}
+                  onToggle={handleToggleActive}
+                />
+              )}
+
+              {filteredMappings.length === 0 && !loading && (
+                <div className="text-center py-16 text-slate-500">
+                  {searchQuery ? `"${searchQuery}" 검색 결과 없음` : '매핑 데이터가 없습니다'}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* ============ 모달 ============ */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+            <div className="bg-[#1A1D25] border border-white/[0.08] rounded-2xl w-full max-w-xl shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-white/[0.06]">
+                <h3 className="text-lg font-bold text-white">
+                  {modalMode === 'add' ? '매핑 추가' : '매핑 수정'}
+                </h3>
+              </div>
+
+              <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
+                {/* 매칭 조건 */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">매칭 조건</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">매칭 소스</label>
+                      <select value={formData.source_type} onChange={e => setFormData(f => ({ ...f, source_type: e.target.value as typeof f.source_type }))}
+                        className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-600/50">
+                        <option value="memo">메모 (W/Q열)</option>
+                        <option value="merchant">거래처명 (G열)</option>
+                        <option value="trading_party">거래자명 (K열)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">우선순위</label>
+                      <select value={formData.priority} onChange={e => setFormData(f => ({ ...f, priority: parseInt(e.target.value) }))}
+                        className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-600/50">
+                        <option value={1}>1순위 (메모 우선)</option>
+                        <option value={2}>2순위 (거래처)</option>
+                        <option value={3}>3순위 (기타)</option>
+                      </select>
+                    </div>
+                  </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">{currentConfig.title}</h2>
-                    <p className="text-sm text-slate-500">회계 및 재무 자동화</p>
+                    <label className="block text-xs text-slate-500 mb-1">입력값 (매칭 키워드)</label>
+                    <input type="text" value={formData.match_value} onChange={e => setFormData(f => ({ ...f, match_value: e.target.value }))}
+                      placeholder="예: 패스트파이브 부가서비스"
+                      className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-600/50" />
+                  </div>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                      <input type="checkbox" checked={!formData.case_sensitive}
+                        onChange={e => setFormData(f => ({ ...f, case_sensitive: !e.target.checked }))}
+                        className="rounded border-white/20 bg-transparent text-violet-600 focus:ring-violet-600 cursor-pointer" />
+                      대소문자 무시
+                    </label>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {currentConfig.bots.map((bot) => {
-                    const status = botStatus[bot.id];
-                    const badge = getStatusBadge(status?.status);
-                    return (
-                      <div key={bot.id} className="p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="text-lg font-bold text-slate-900">{bot.name}</h3>
-                            <p className="text-sm text-slate-500 mt-1">
-                              ⏰ {bot.schedule}
-                            </p>
-                          </div>
-                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${badge.bg} ${badge.text}`}>
-                            {badge.label}
-                          </span>
-                        </div>
+                <div className="h-px bg-white/[0.06]" />
 
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm">
-                            <span className="text-slate-400">마지막 실행:</span>
-                            <span className="text-slate-700 font-medium ml-2">{formatTime(status?.endTime)}</span>
-                          </div>
-                          {bot.hasManualRun && (
-                            <button className="px-4 py-2 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-semibold rounded-lg transition-all active:scale-95">
-                              ▶ 실행
-                            </button>
-                          )}
-                        </div>
-
-                        {status?.message && (
-                          <div className="mt-3 p-3 bg-slate-100 rounded-lg">
-                            <p className="text-xs text-slate-600">{status.message}</p>
-                          </div>
-                        )}
-
-                        {/* 캐시 잔액 특별 표시 */}
-                        {bot.id === 'cash-bot' && status?.result?.difference !== undefined && (
-                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-amber-700 font-medium">차이 금액:</span>
-                              <span className="text-amber-900 font-bold">
-                                {status.result.difference.toLocaleString()}원
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">📋 EV3 실행 로그</h3>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {logs.filter(log => log.botId === 'accounting' || log.botId === 'cash-bot').slice(0, 15).map((log, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm py-2 px-3 bg-slate-50 rounded-lg">
-                      <span className="text-slate-400 text-xs w-24 flex-shrink-0">{formatTime(log.endTime)}</span>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                        {log.status === 'SUCCESS' ? '성공' : '실패'}
-                      </span>
-                      <span className="font-semibold text-[#8B5CF6]">[{log.botName}]</span>
-                      <span className="text-slate-700 truncate flex-1">{log.message}</span>
+                {/* 결과값 */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">결과값</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">계정코드 *</label>
+                      <input type="text" value={formData.account_code} onChange={e => setFormData(f => ({ ...f, account_code: e.target.value }))}
+                        placeholder="예: 8319"
+                        className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-violet-600/50" />
                     </div>
-                  ))}
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">계정명</label>
+                      <input type="text" value={formData.account_name} onChange={e => setFormData(f => ({ ...f, account_name: e.target.value }))}
+                        placeholder="예: 지급수수료"
+                        className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-600/50" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">거래처코드</label>
+                      <input type="text" value={formData.vendor_code} onChange={e => setFormData(f => ({ ...f, vendor_code: e.target.value }))}
+                        placeholder="예: 11116"
+                        className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-violet-600/50" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">전표유형</label>
+                      <select value={formData.voucher_type} onChange={e => setFormData(f => ({ ...f, voucher_type: e.target.value as typeof f.voucher_type }))}
+                        className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-600/50">
+                        <option value="both">공통 (일반+매입)</option>
+                        <option value="general">일반전표만</option>
+                        <option value="purchase">매입전표만</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">메모</label>
+                    <input type="text" value={formData.notes} onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="관리 메모 (선택)"
+                      className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-600/50" />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* 텔레그램 안내 */}
-          <div className="bg-gradient-to-r from-[#1E9EDE]/10 to-[#3B82F6]/10 border border-[#1E9EDE]/20 rounded-xl p-5">
-            <div className="flex items-start gap-4">
-              <span className="text-3xl">💬</span>
-              <div className="flex-1">
-                <div className="font-bold text-slate-900 mb-2">텔레그램 명령어</div>
-                <div className="space-y-1 text-sm text-slate-600">
-                  <div><code className="bg-white px-2 py-1 rounded font-mono">/help</code> - 도움말</div>
-                  <div><code className="bg-white px-2 py-1 rounded font-mono">/status</code> - 전체 상태 확인</div>
-                  <div><code className="bg-white px-2 py-1 rounded font-mono">/run 올리브영</code> - 올리브영 스크래퍼 실행</div>
-                  <div><code className="bg-white px-2 py-1 rounded font-mono">/run 회계</code> - 회계전표 업로드 실행</div>
-                  <div><code className="bg-white px-2 py-1 rounded font-mono">/run 캐시</code> - 캐시 잔액 확인 실행</div>
-                </div>
+              <div className="px-6 py-4 border-t border-white/[0.06] flex justify-end gap-3">
+                <button onClick={() => setShowModal(false)}
+                  className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 rounded-lg hover:bg-white/[0.05] transition-all cursor-pointer">
+                  취소
+                </button>
+                <button onClick={handleSave}
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-all cursor-pointer active:scale-95">
+                  {modalMode === 'add' ? '추가' : '저장'}
+                </button>
               </div>
             </div>
           </div>
-        </main>
+        )}
       </div>
     </>
+  );
+}
+
+// ============ 매핑 섹션 컴포넌트 ============
+function MappingSection({
+  title, subtitle, mappings, onEdit, onDelete, onToggle
+}: {
+  title: string;
+  subtitle: string;
+  mappings: AccountMapping[];
+  onEdit: (m: AccountMapping) => void;
+  onDelete: (id: number) => void;
+  onToggle: (m: AccountMapping) => void;
+}) {
+  return (
+    <div className="bg-[#13151B] rounded-2xl border border-white/[0.06] overflow-hidden">
+      <div className="px-6 py-4 border-b border-white/[0.06]">
+        <h3 className="text-sm font-bold text-white">{title}</h3>
+        <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.06]">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 w-8">활성</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">입력값</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">매칭소스</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">계정코드</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">계정명</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">거래처코드</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">전표유형</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 w-24">관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mappings.map((m) => (
+              <tr key={m.id} className={`border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors ${!m.is_active ? 'opacity-40' : ''}`}>
+                <td className="px-4 py-2.5">
+                  <button onClick={() => onToggle(m)} className="cursor-pointer">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs transition-all ${m.is_active ? 'bg-violet-600/30 text-violet-400' : 'bg-slate-800 text-slate-600'}`}>
+                      {m.is_active ? '✓' : ''}
+                    </div>
+                  </button>
+                </td>
+                <td className="px-4 py-2.5">
+                  <code className="text-violet-300 text-xs bg-violet-900/20 px-2 py-0.5 rounded">{m.match_value}</code>
+                  {!m.case_sensitive && <span className="ml-1.5 text-[10px] text-slate-600">Aa무시</span>}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-slate-400">{SOURCE_LABELS[m.source_type] || m.source_type}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-emerald-400 font-semibold">{m.account_code}</td>
+                <td className="px-4 py-2.5 text-xs text-slate-300">{m.account_name}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-amber-400">{m.vendor_code || '-'}</td>
+                <td className="px-4 py-2.5">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                    m.voucher_type === 'both' ? 'bg-slate-800 text-slate-400' :
+                    m.voucher_type === 'general' ? 'bg-blue-900/30 text-blue-400' :
+                    'bg-orange-900/30 text-orange-400'
+                  }`}>{VOUCHER_LABELS[m.voucher_type]}</span>
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => onEdit(m)}
+                      className="px-2 py-1 text-xs text-slate-400 hover:text-violet-400 hover:bg-violet-900/20 rounded transition-all cursor-pointer">
+                      수정
+                    </button>
+                    <button onClick={() => onDelete(m.id)}
+                      className="px-2 py-1 text-xs text-slate-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-all cursor-pointer">
+                      삭제
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
