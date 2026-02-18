@@ -41,9 +41,9 @@ type ModalMode = 'add' | 'edit';
 
 // ============ 유틸리티 ============
 const SOURCE_LABELS: Record<string, string> = {
-  memo: '메모',
-  merchant: '거래처명 / 적요',
-  trading_party: '거래자명',
+  memo: '메모 (W열/Q열)',
+  merchant: '거래처명 (G열)',
+  trading_party: '거래자명 (K열)',
 };
 
 const VOUCHER_LABELS: Record<string, string> = {
@@ -183,16 +183,8 @@ export default function AccountingPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.match_value) {
-      alert('입력값은 필수입니다.');
-      return;
-    }
-    if (formData.priority === 1 && !formData.account_code) {
-      alert('1순위 매핑은 계정코드가 필수입니다.');
-      return;
-    }
-    if (!formData.account_code && !formData.vendor_code) {
-      alert('계정코드 또는 거래처코드 중 하나는 입력해야 합니다.');
+    if (!formData.match_value || !formData.account_code) {
+      alert('입력값과 계정코드는 필수입니다.');
       return;
     }
     try {
@@ -433,9 +425,9 @@ export default function AccountingPage() {
                   className="px-4 py-2.5 bg-[#13151B] border border-white/[0.08] rounded-xl text-sm text-slate-300 focus:outline-none focus:border-violet-600/50 cursor-pointer"
                 >
                   <option value="all">매칭소스: 전체</option>
-                  <option value="memo">메모</option>
-                  <option value="merchant">거래처명 / 적요</option>
-                  <option value="trading_party">거래자명</option>
+                  <option value="memo">메모 (W/Q열)</option>
+                  <option value="merchant">거래처명 (G열)</option>
+                  <option value="trading_party">거래자명 (K열)</option>
                 </select>
                 <button
                   onClick={openAddModal}
@@ -456,8 +448,8 @@ export default function AccountingPage() {
               {/* 1순위: 메모 기반 */}
               {memoMappings.length > 0 && (
                 <MappingSection
-                  title="1순위 — 메모 기반 매핑"
-                  subtitle="카드: card_merged W열(메모) | 은행: clobe_labeling Q열(메모)에서 키워드 매칭"
+                  title="1순위 — 메모 기반 매핑 (W열/Q열)"
+                  subtitle="카드 메모 또는 은행 메모에서 키워드가 매칭되면 적용"
                   mappings={memoMappings}
                   onEdit={openEditModal}
                   onDelete={handleDelete}
@@ -469,7 +461,7 @@ export default function AccountingPage() {
               {merchantMappings.length > 0 && (
                 <MappingSection
                   title="2순위 — 거래처/거래자 기반 매핑"
-                  subtitle="카드: card_merged G열(가맹점명) | 은행: clobe_labeling J열(적요), K열(거래자명)에서 키워드 매칭"
+                  subtitle="거래처명(G열), 거래자명(K열), 적요(J열)에서 키워드가 매칭되면 적용"
                   mappings={merchantMappings}
                   onEdit={openEditModal}
                   onDelete={handleDelete}
@@ -505,29 +497,19 @@ export default function AccountingPage() {
                       <label className="block text-xs text-slate-500 mb-1">매칭 소스</label>
                       <select value={formData.source_type} onChange={e => setFormData(f => ({ ...f, source_type: e.target.value as typeof f.source_type }))}
                         className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-600/50">
-                        <option value="memo">메모</option>
-                        <option value="merchant">거래처명 / 적요</option>
-                        <option value="trading_party">거래자명</option>
+                        <option value="memo">메모 (W/Q열)</option>
+                        <option value="merchant">거래처명 (G열)</option>
+                        <option value="trading_party">거래자명 (K열)</option>
                       </select>
-                      <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
-                        {formData.source_type === 'memo' && '📂 카드: card_merged W열(메모) | 은행: clobe_labeling Q열(메모)'}
-                        {formData.source_type === 'merchant' && '📂 카드: card_merged G열(가맹점명) | 은행: clobe_labeling J열(적요), K열(거래자명)'}
-                        {formData.source_type === 'trading_party' && '📂 은행: clobe_labeling K열(거래자명)'}
-                      </p>
                     </div>
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">우선순위</label>
                       <select value={formData.priority} onChange={e => setFormData(f => ({ ...f, priority: parseInt(e.target.value) }))}
                         className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-600/50">
-                        <option value={1}>1순위</option>
-                        <option value={2}>2순위</option>
-                        <option value={3}>3순위</option>
+                        <option value={1}>1순위 (메모 우선)</option>
+                        <option value={2}>2순위 (거래처)</option>
+                        <option value={3}>3순위 (기타)</option>
                       </select>
-                      <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
-                        {formData.priority === 1 && '가장 먼저 매칭. 메모 키워드로 계정코드를 확정할 때 사용'}
-                        {formData.priority === 2 && '1순위에 매칭 안 된 경우 실행. 거래처/가맹점명으로 매칭'}
-                        {formData.priority === 3 && '1~2순위 모두 매칭 안 된 경우 최후에 실행'}
-                      </p>
                     </div>
                   </div>
                   <div>
@@ -551,12 +533,9 @@ export default function AccountingPage() {
                 {/* 결과값 */}
                 <div className="space-y-3">
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">결과값</label>
-                  {formData.priority >= 2 && (
-                    <p className="text-[10px] text-amber-400/70">💡 2순위 이상은 거래처코드만 입력해도 됩니다. 계정코드가 비어있으면 1순위 매핑의 계정코드가 적용됩니다.</p>
-                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">계정코드 {formData.priority === 1 ? '*' : ''}</label>
+                      <label className="block text-xs text-slate-500 mb-1">계정코드 *</label>
                       <input type="text" value={formData.account_code} onChange={e => setFormData(f => ({ ...f, account_code: e.target.value }))}
                         placeholder="예: 8319"
                         className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-violet-600/50" />
