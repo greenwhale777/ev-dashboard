@@ -81,6 +81,8 @@ interface CompareData {
   keyword: string;
   date: string;
   previous_date: string;
+  today_time: string | null;
+  prev_time: string | null;
   today_count: number;
   prev_count: number;
   new_entries: number;
@@ -894,7 +896,7 @@ export default function TikTokAnalyzerPage() {
                                   </button>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); deleteSearch(search.id, kw.id, kw.keyword); }}
-                                    className="ml-2 px-2 py-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                    className="ml-2 px-2.5 py-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition"
                                     title="삭제"
                                   >
                                     🗑
@@ -936,7 +938,7 @@ export default function TikTokAnalyzerPage() {
                         &quot;{compareData.keyword}&quot; 분석
                       </h3>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {formatReportDate(compareData.previous_date)} → {formatReportDate(compareData.date)}
+                        {compareData.prev_time || formatReportDate(compareData.previous_date)} → {compareData.today_time || formatReportDate(compareData.date)}
                       </p>
                     </div>
                     <button
@@ -957,8 +959,8 @@ export default function TikTokAnalyzerPage() {
                   <div className="flex gap-2 mt-4">
                     {[
                       { key: 'insights', label: '💡 특이사항' },
-                      { key: 'today', label: `📅 ${formatReportDate(compareData.date)}` },
-                      { key: 'previous', label: `📅 ${formatReportDate(compareData.previous_date)}` },
+                      { key: 'today', label: `📅 ${compareData.today_time || formatReportDate(compareData.date)}` },
+                      { key: 'previous', label: `📅 ${compareData.prev_time || formatReportDate(compareData.previous_date)}` },
                     ].map((mode) => (
                       <button
                         key={mode.key}
@@ -1262,7 +1264,7 @@ export default function TikTokAnalyzerPage() {
                   }}
                   className="px-3 py-2 border rounded-lg text-sm bg-white"
                 >
-                  <option value="">키워드 선택</option>
+                  {!analyticsKeyword && <option value="" disabled hidden>키워드 선택</option>}
                   {keywords.filter(k => k.is_active).map(k => (
                     <option key={k.id} value={k.keyword}>{k.keyword}</option>
                   ))}
