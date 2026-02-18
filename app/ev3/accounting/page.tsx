@@ -298,23 +298,6 @@ export default function AccountingPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                {triggerResult && (
-                  <span className="text-sm text-slate-300 animate-fade-in">{triggerResult}</span>
-                )}
-                <button
-                  onClick={handleTrigger}
-                  disabled={triggering}
-                  className="group relative px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-900/40 hover:shadow-violet-800/50"
-                >
-                  {triggering ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                      실행 중...
-                    </span>
-                  ) : '▶ 수동 실행'}
-                </button>
-              </div>
             </div>
           </div>
         </header>
