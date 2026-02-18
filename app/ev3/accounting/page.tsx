@@ -42,8 +42,8 @@ type ModalMode = 'add' | 'edit';
 // ============ 유틸리티 ============
 const SOURCE_LABELS: Record<string, string> = {
   memo: '메모',
-  merchant: '거래처명 / 적요',
-  trading_party: '거래자명',
+  merchant: '거래처명',
+  trading_party: '거래자 / 적요',
 };
 
 const VOUCHER_LABELS: Record<string, string> = {
@@ -434,8 +434,8 @@ export default function AccountingPage() {
                 >
                   <option value="all">매칭소스: 전체</option>
                   <option value="memo">메모</option>
-                  <option value="merchant">거래처명 / 적요</option>
-                  <option value="trading_party">거래자명</option>
+                  <option value="merchant">거래처명</option>
+                  <option value="trading_party">거래자 / 적요</option>
                 </select>
                 <button
                   onClick={openAddModal}
@@ -469,7 +469,7 @@ export default function AccountingPage() {
               {merchantMappings.length > 0 && (
                 <MappingSection
                   title="2순위 — 거래처/거래자 기반 매핑"
-                  subtitle="카드: card_merged G열(가맹점명) | 은행: clobe_labeling J열(적요), K열(거래자명)에서 키워드 매칭"
+                  subtitle="카드: card_merged G열(가맹점명) | 은행: clobe_labeling K열(거래자명), J열(적요)에서 키워드 매칭"
                   mappings={merchantMappings}
                   onEdit={openEditModal}
                   onDelete={handleDelete}
@@ -506,13 +506,13 @@ export default function AccountingPage() {
                       <select value={formData.source_type} onChange={e => setFormData(f => ({ ...f, source_type: e.target.value as typeof f.source_type }))}
                         className="w-full px-3 py-2 bg-[#0F1117] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-600/50">
                         <option value="memo">메모</option>
-                        <option value="merchant">거래처명 / 적요</option>
-                        <option value="trading_party">거래자명</option>
+                        <option value="merchant">거래처명</option>
+                        <option value="trading_party">거래자 / 적요</option>
                       </select>
                       <p className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
                         {formData.source_type === 'memo' && '📂 카드: card_merged W열(메모) | 은행: clobe_labeling Q열(메모)'}
-                        {formData.source_type === 'merchant' && '📂 카드: card_merged G열(가맹점명) | 은행: clobe_labeling J열(적요), K열(거래자명)'}
-                        {formData.source_type === 'trading_party' && '📂 은행: clobe_labeling K열(거래자명)'}
+                        {formData.source_type === 'merchant' && '📂 카드: card_merged G열(가맹점명)'}
+                        {formData.source_type === 'trading_party' && '📂 은행: clobe_labeling K열(거래자명), J열(적요)'}
                       </p>
                     </div>
                     <div>
