@@ -162,7 +162,7 @@ export default function TikTokAnalyzerPage() {
   const [keywordSearches, setKeywordSearches] = useState<Record<number, TikTokSearch[]>>({});
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily' | 'analytics'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily' | 'analytics' | 'ai'>('search');
 
   // Daily Report state
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
@@ -671,6 +671,7 @@ export default function TikTokAnalyzerPage() {
             { key: 'keywords', label: '🏷️ 키워드 관리', count: keywords.length },
             { key: 'daily', label: '📅 Daily Report', count: dailyReports.length },
             { key: 'analytics', label: '🔬 분석', count: null },
+            { key: 'ai', label: '🤖 AI 채팅', count: null },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -1441,19 +1442,63 @@ export default function TikTokAnalyzerPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
 
-            {/* AI 채팅 분석 */}
+        {/* ============================================================ */}
+        {/* AI Chat Tab */}
+        {/* ============================================================ */}
+        {activeTab === 'ai' && (
+          <div className="space-y-4">
+            {/* 키워드 + 날짜 선택 */}
             <div className="bg-white rounded-2xl border p-4">
-              <h4 className="font-bold text-gray-800 mb-3">🤖 AI 분석 채팅</h4>
-              <p className="text-xs text-gray-400 mb-3">
-                {analyticsKeyword && analyticsDate 
-                  ? `${analyticsKeyword} · ${analyticsDate} 데이터 기반으로 답변합니다` 
-                  : '키워드와 날짜를 선택하면 해당 데이터 기반으로 답변합니다'}
-              </p>
+              <h3 className="font-bold text-gray-900 mb-2">🤖 AI 분석 채팅</h3>
+              <p className="text-xs text-gray-400 mb-3">수집된 TikTok 데이터를 기반으로 AI가 분석합니다</p>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={analyticsKeyword}
+                  onChange={async (e) => {
+                    setAnalyticsKeyword(e.target.value);
+                    setAnalyticsDate('');
+                    if (e.target.value) {
+                      try {
+                        const res = await fetch(`${API_URL}/api/tiktok/analytics/dates/${encodeURIComponent(e.target.value)}`);
+                        const data = await res.json();
+                        if (data.success) setAnalyticsDates(data.data || []);
+                      } catch {}
+                    }
+                  }}
+                  className="px-3 py-2 border rounded-lg text-sm bg-white"
+                >
+                  {!analyticsKeyword && <option value="" disabled hidden>키워드 선택</option>}
+                  {keywords.filter(k => k.is_active).map(k => (
+                    <option key={k.id} value={k.keyword}>{k.keyword}</option>
+                  ))}
+                </select>
+                <select
+                  value={analyticsDate}
+                  onChange={(e) => setAnalyticsDate(e.target.value)}
+                  className="px-3 py-2 border rounded-lg text-sm bg-white"
+                  disabled={!analyticsKeyword}
+                >
+                  {!analyticsDate && <option value="" disabled hidden>날짜 선택</option>}
+                  {analyticsDates.map(d => (
+                    <option key={d.date} value={d.date}>{d.date} ({d.search_count}회 · {d.total_videos}개)</option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400 self-center">
+                  {analyticsKeyword && analyticsDate 
+                    ? `✅ ${analyticsKeyword} · ${analyticsDate} 데이터 기반` 
+                    : '선택 없이도 질문 가능 (최근 데이터 기반)'}
+                </span>
+              </div>
+            </div>
 
-              {/* 메시지 영역 */}
+            {/* 채팅 영역 */}
+            <div className="bg-white rounded-2xl border p-4">
+              {/* 메시지 */}
               {aiMessages.length > 0 && (
-                <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                <div className="space-y-3 mb-4 max-h-[500px] overflow-y-auto">
                   {aiMessages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] p-3 rounded-xl text-sm whitespace-pre-wrap ${
@@ -1473,15 +1518,17 @@ export default function TikTokAnalyzerPage() {
                 </div>
               )}
 
-              {/* 빠른 질문 버튼 */}
+              {/* 빠른 질문 */}
               {aiMessages.length === 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap gap-2 mb-4">
                   {[
                     '특징적인 영상이 있어?',
                     '좋아요가 급증한 영상은?',
                     '어떤 크리에이터가 강세야?',
                     '마케팅 인사이트 알려줘',
                     '조회수 대비 좋아요 비율이 높은 영상은?',
+                    'TOP 10 영상의 공통점은?',
+                    '가장 빠르게 성장하는 영상은?',
                   ].map(q => (
                     <button
                       key={q}
@@ -1489,7 +1536,7 @@ export default function TikTokAnalyzerPage() {
                         setAiQuestion(q);
                         handleAiChat(q);
                       }}
-                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-700 transition"
+                      className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border rounded-lg text-xs text-gray-700 transition"
                     >
                       {q}
                     </button>
@@ -1504,21 +1551,21 @@ export default function TikTokAnalyzerPage() {
                   value={aiQuestion}
                   onChange={(e) => setAiQuestion(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(aiQuestion); }}
-                  placeholder="질문을 입력하세요..."
-                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                  placeholder="질문을 입력하세요... (예: anua 영상 중 특이한 트렌드가 있어?)"
+                  className="flex-1 px-4 py-2.5 border rounded-xl text-sm"
                   disabled={aiLoading}
                 />
                 <button
                   onClick={() => aiQuestion.trim() && handleAiChat(aiQuestion)}
                   disabled={aiLoading || !aiQuestion.trim()}
-                  className="px-4 py-2 bg-[#1E9EDE] text-white rounded-lg text-sm font-medium hover:bg-[#1789c4] transition disabled:opacity-50"
+                  className="px-5 py-2.5 bg-[#0F172A] text-white rounded-xl text-sm font-medium hover:bg-[#1e293b] transition disabled:opacity-50"
                 >
-                  전송
+                  {aiLoading ? '분석 중...' : '전송'}
                 </button>
                 {aiMessages.length > 0 && (
                   <button
                     onClick={() => setAiMessages([])}
-                    className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition"
+                    className="px-3 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
                   >
                     초기화
                   </button>
