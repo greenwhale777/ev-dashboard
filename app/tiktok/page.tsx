@@ -180,6 +180,9 @@ export default function TikTokAnalyzerPage() {
   const [aiMessages, setAiMessages] = useState<{role: string; content: string}[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [analyticsDates, setAnalyticsDates] = useState<any[]>([]);
+  const [aiChatId, setAiChatId] = useState<number | null>(null);
+  const [aiChatHistory, setAiChatHistory] = useState<any[]>([]);
+  const [showAiHistory, setShowAiHistory] = useState(false);
 
   // ============================================================
   // Data Fetching
@@ -457,11 +460,12 @@ export default function TikTokAnalyzerPage() {
       const res = await fetch(`${API_URL}/api/tiktok/ai-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, chatId: aiChatId }),
       });
       const data = await res.json();
       if (data.success) {
         setAiMessages(prev => [...prev, { role: 'assistant', content: data.data.answer }]);
+        if (data.data.chatId) setAiChatId(data.data.chatId);
       } else {
         setAiMessages(prev => [...prev, { role: 'assistant', content: '오류: ' + data.error }]);
       }
@@ -470,6 +474,41 @@ export default function TikTokAnalyzerPage() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const fetchAiChatHistory = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/ai-chats?limit=30`);
+      const data = await res.json();
+      if (data.success) setAiChatHistory(data.data || []);
+    } catch {}
+  };
+
+  const loadAiChat = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/api/tiktok/ai-chats/${id}`);
+      const data = await res.json();
+      if (data.success) {
+        setAiChatId(id);
+        setAiMessages(data.data.messages.map((m: any) => ({ role: m.role, content: m.content })));
+        setShowAiHistory(false);
+      }
+    } catch {}
+  };
+
+  const deleteAiChat = async (id: number) => {
+    if (!confirm('이 대화를 삭제하시겠습니까?')) return;
+    try {
+      await fetch(`${API_URL}/api/tiktok/ai-chats/${id}`, { method: 'DELETE' });
+      fetchAiChatHistory();
+      if (aiChatId === id) { setAiChatId(null); setAiMessages([]); }
+    } catch {}
+  };
+
+  const startNewAiChat = () => {
+    setAiChatId(null);
+    setAiMessages([]);
+    setAiQuestion('');
   };
 
   // ============================================================
@@ -1477,9 +1516,55 @@ export default function TikTokAnalyzerPage() {
           <div className="space-y-4">
             {/* 헤더 */}
             <div className="bg-white rounded-2xl border p-4">
-              <h3 className="font-bold text-gray-900 mb-1">🤖 AI 분석 채팅</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-bold text-gray-900">🤖 AI 분석 채팅</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={startNewAiChat}
+                    className="px-3 py-1.5 bg-[#0F172A] text-white rounded-lg text-xs font-medium hover:bg-[#1e293b] transition"
+                  >
+                    + 새 대화
+                  </button>
+                  <button
+                    onClick={() => { setShowAiHistory(!showAiHistory); if (!showAiHistory) fetchAiChatHistory(); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${showAiHistory ? 'bg-[#0F172A] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  >
+                    📋 대화 이력
+                  </button>
+                </div>
+              </div>
               <p className="text-xs text-gray-400">수집된 TikTok 데이터를 AI가 자동으로 조회하고 분석합니다. 자유롭게 질문하세요.</p>
             </div>
+
+            {/* 대화 이력 패널 */}
+            {showAiHistory && (
+              <div className="bg-white rounded-2xl border p-4">
+                <h4 className="font-bold text-gray-800 mb-3">📋 대화 이력</h4>
+                {aiChatHistory.length > 0 ? (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {aiChatHistory.map((chat) => (
+                      <div key={chat.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <button
+                          onClick={() => loadAiChat(chat.id)}
+                          className="flex-1 text-left"
+                        >
+                          <p className="text-sm font-medium text-gray-800 truncate">{chat.title}</p>
+                          <p className="text-xs text-gray-400">{new Date(chat.updated_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {chat.message_count}개 메시지</p>
+                        </button>
+                        <button
+                          onClick={() => deleteAiChat(chat.id)}
+                          className="ml-2 px-2 py-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 text-center py-3">저장된 대화가 없습니다</p>
+                )}
+              </div>
+            )}
 
             {/* 채팅 영역 */}
             <div className="bg-white rounded-2xl border p-4">
@@ -1551,10 +1636,10 @@ export default function TikTokAnalyzerPage() {
                 </button>
                 {aiMessages.length > 0 && (
                   <button
-                    onClick={() => setAiMessages([])}
+                    onClick={startNewAiChat}
                     className="px-3 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
                   >
-                    초기화
+                    새 대화
                   </button>
                 )}
               </div>
