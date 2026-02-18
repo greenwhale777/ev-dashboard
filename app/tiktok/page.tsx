@@ -432,7 +432,7 @@ export default function TikTokAnalyzerPage() {
       const res = await fetch(`${API_URL}/api/tiktok/ai-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, keyword: analyticsKeyword || undefined, date: analyticsDate || undefined }),
+        body: JSON.stringify({ question }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1450,48 +1450,10 @@ export default function TikTokAnalyzerPage() {
         {/* ============================================================ */}
         {activeTab === 'ai' && (
           <div className="space-y-4">
-            {/* 키워드 + 날짜 선택 */}
+            {/* 헤더 */}
             <div className="bg-white rounded-2xl border p-4">
-              <h3 className="font-bold text-gray-900 mb-2">🤖 AI 분석 채팅</h3>
-              <p className="text-xs text-gray-400 mb-3">수집된 TikTok 데이터를 기반으로 AI가 분석합니다</p>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  value={analyticsKeyword}
-                  onChange={async (e) => {
-                    setAnalyticsKeyword(e.target.value);
-                    setAnalyticsDate('');
-                    if (e.target.value) {
-                      try {
-                        const res = await fetch(`${API_URL}/api/tiktok/analytics/dates/${encodeURIComponent(e.target.value)}`);
-                        const data = await res.json();
-                        if (data.success) setAnalyticsDates(data.data || []);
-                      } catch {}
-                    }
-                  }}
-                  className="px-3 py-2 border rounded-lg text-sm bg-white"
-                >
-                  {!analyticsKeyword && <option value="" disabled hidden>키워드 선택</option>}
-                  {keywords.filter(k => k.is_active).map(k => (
-                    <option key={k.id} value={k.keyword}>{k.keyword}</option>
-                  ))}
-                </select>
-                <select
-                  value={analyticsDate}
-                  onChange={(e) => setAnalyticsDate(e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm bg-white"
-                  disabled={!analyticsKeyword}
-                >
-                  {!analyticsDate && <option value="" disabled hidden>날짜 선택</option>}
-                  {analyticsDates.map(d => (
-                    <option key={d.date} value={d.date}>{d.date} ({d.search_count}회 · {d.total_videos}개)</option>
-                  ))}
-                </select>
-                <span className="text-xs text-gray-400 self-center">
-                  {analyticsKeyword && analyticsDate 
-                    ? `✅ ${analyticsKeyword} · ${analyticsDate} 데이터 기반` 
-                    : '선택 없이도 질문 가능 (최근 데이터 기반)'}
-                </span>
-              </div>
+              <h3 className="font-bold text-gray-900 mb-1">🤖 AI 분석 채팅</h3>
+              <p className="text-xs text-gray-400">수집된 TikTok 데이터를 AI가 자동으로 조회하고 분석합니다. 자유롭게 질문하세요.</p>
             </div>
 
             {/* 채팅 영역 */}
@@ -1512,7 +1474,7 @@ export default function TikTokAnalyzerPage() {
                   ))}
                   {aiLoading && (
                     <div className="flex justify-start">
-                      <div className="bg-gray-100 p-3 rounded-xl text-sm text-gray-400">분석 중...</div>
+                      <div className="bg-gray-100 p-3 rounded-xl text-sm text-gray-400">데이터 조회 및 분석 중...</div>
                     </div>
                   )}
                 </div>
@@ -1522,13 +1484,13 @@ export default function TikTokAnalyzerPage() {
               {aiMessages.length === 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {[
-                    '특징적인 영상이 있어?',
-                    '좋아요가 급증한 영상은?',
-                    '어떤 크리에이터가 강세야?',
-                    '마케팅 인사이트 알려줘',
-                    '조회수 대비 좋아요 비율이 높은 영상은?',
-                    'TOP 10 영상의 공통점은?',
-                    '가장 빠르게 성장하는 영상은?',
+                    'anua 최근 영상 중 특이한 트렌드가 있어?',
+                    '오늘 전체 키워드 중 가장 핫한 키워드는?',
+                    '여러 키워드에 걸쳐 등장하는 크리에이터가 있어?',
+                    'skincare vs kbeauty TOP5 비교해줘',
+                    'drmelaxin 최근 7일 추이는?',
+                    '전체에서 좋아요가 가장 많은 영상 TOP 10은?',
+                    '어떤 키워드들이 등록되어 있어?',
                   ].map(q => (
                     <button
                       key={q}
@@ -1551,7 +1513,7 @@ export default function TikTokAnalyzerPage() {
                   value={aiQuestion}
                   onChange={(e) => setAiQuestion(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(aiQuestion); }}
-                  placeholder="질문을 입력하세요... (예: anua 영상 중 특이한 트렌드가 있어?)"
+                  placeholder="무엇이든 질문하세요... (예: centella와 skin1004 영상 크리에이터 비교해줘)"
                   className="flex-1 px-4 py-2.5 border rounded-xl text-sm"
                   disabled={aiLoading}
                 />
