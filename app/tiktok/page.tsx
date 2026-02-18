@@ -422,6 +422,31 @@ export default function TikTokAnalyzerPage() {
   };
 
   // ============================================================
+  // AI Message Renderer (URL 하이퍼링크 + 마크다운 볼드)
+  // ============================================================
+  const renderAiMessage = (content: string) => {
+    // 마크다운 링크 [텍스트](URL) + 일반 URL + **볼드** 처리
+    const parts = content.split(/(\[.*?\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s)]+|\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      // 마크다운 링크: [텍스트](URL)
+      const mdLink = part.match(/^\[(.*?)\]\((https?:\/\/[^\s)]+)\)$/);
+      if (mdLink) {
+        return <a key={i} href={mdLink[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{mdLink[1]}</a>;
+      }
+      // 일반 URL
+      if (/^https?:\/\//.test(part)) {
+        const label = part.includes('tiktok.com') ? '🔗 TikTok' : '🔗 링크';
+        return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{label}</a>;
+      }
+      // **볼드**
+      if (/^\*\*.*\*\*$/.test(part)) {
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  // ============================================================
   // AI Chat
   // ============================================================
   const handleAiChat = async (question: string) => {
@@ -1468,7 +1493,7 @@ export default function TikTokAnalyzerPage() {
                           ? 'bg-[#0F172A] text-white' 
                           : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {msg.content}
+                        {msg.role === 'user' ? msg.content : renderAiMessage(msg.content)}
                       </div>
                     </div>
                   ))}
