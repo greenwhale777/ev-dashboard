@@ -160,7 +160,7 @@ export default function TikTokAnalyzerPage() {
   const [keywordSearches, setKeywordSearches] = useState<Record<number, TikTokSearch[]>>({});
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily' | 'analytics'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily'>('search');
 
   // Daily Report state
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
@@ -168,16 +168,6 @@ export default function TikTokAnalyzerPage() {
   const [compareData, setCompareData] = useState<CompareData | null>(null);
   const [compareViewMode, setCompareViewMode] = useState<'insights' | 'today' | 'previous'>('insights');
   const [loadingReport, setLoadingReport] = useState(false);
-
-  // Analytics state
-  const [analyticsKeyword, setAnalyticsKeyword] = useState('');
-  const [analyticsDate, setAnalyticsDate] = useState('');
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiMessages, setAiMessages] = useState<{role: string; content: string}[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [analyticsDates, setAnalyticsDates] = useState<any[]>([]);
 
   // ============================================================
   // Data Fetching
@@ -398,16 +388,6 @@ export default function TikTokAnalyzerPage() {
     }
   };
 
-  const deleteSearch = async (searchId: number, kwId: number, kwKeyword: string) => {
-    if (!confirm('이 검색이력을 삭제하시겠습니까?')) return;
-    try {
-      await fetch(`${API_URL}/api/tiktok/search/${searchId}`, { method: 'DELETE' });
-      fetchKeywordHistory(kwId, kwKeyword);
-    } catch (err) {
-      console.error('Failed to delete search:', err);
-    }
-  };
-
   const toggleKeywordHistory = (kw: Keyword) => {
     if (expandedKeyword === kw.id) {
       setExpandedKeyword(null);
@@ -416,32 +396,6 @@ export default function TikTokAnalyzerPage() {
       if (!keywordSearches[kw.id]) {
         fetchKeywordHistory(kw.id, kw.keyword);
       }
-    }
-  };
-
-  // ============================================================
-  // AI Chat
-  // ============================================================
-  const handleAiChat = async (question: string) => {
-    setAiMessages(prev => [...prev, { role: 'user', content: question }]);
-    setAiQuestion('');
-    setAiLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/tiktok/ai-chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, keyword: analyticsKeyword || undefined, date: analyticsDate || undefined }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAiMessages(prev => [...prev, { role: 'assistant', content: data.data.answer }]);
-      } else {
-        setAiMessages(prev => [...prev, { role: 'assistant', content: '오류: ' + data.error }]);
-      }
-    } catch (err) {
-      setAiMessages(prev => [...prev, { role: 'assistant', content: '네트워크 오류가 발생했습니다.' }]);
-    } finally {
-      setAiLoading(false);
     }
   };
 
@@ -668,7 +622,6 @@ export default function TikTokAnalyzerPage() {
             { key: 'search', label: '📊 검색 결과', count: videos.length },
             { key: 'keywords', label: '🏷️ 키워드 관리', count: keywords.length },
             { key: 'daily', label: '📅 Daily Report', count: dailyReports.length },
-            { key: 'analytics', label: '🔬 분석', count: null },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -679,7 +632,7 @@ export default function TikTokAnalyzerPage() {
                 }`}
             >
               {tab.label}
-              {tab.count != null && tab.count > 0 && (
+              {tab.count > 0 && (
                 <span className="ml-1.5 px-1.5 py-0.5 bg-white/20 rounded text-xs">
                   {tab.count}
                 </span>
@@ -880,26 +833,20 @@ export default function TikTokAnalyzerPage() {
                           keywordSearches[kw.id].length > 0 ? (
                             <div className="space-y-1.5">
                               {keywordSearches[kw.id].map((search) => (
-                                <div
+                                <button
                                   key={search.id}
-                                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg border hover:shadow-sm transition text-left"
+                                  onClick={() => fetchSearchDetail(search.id)}
+                                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg border hover:shadow-sm hover:border-[#1E9EDE] transition text-left"
                                 >
-                                  <button
-                                    onClick={() => fetchSearchDetail(search.id)}
-                                    className="flex items-center gap-3 flex-1 hover:text-[#1E9EDE] transition"
-                                  >
+                                  <div className="flex items-center gap-3">
                                     <span className="text-xs text-gray-500 w-28">{formatShortDate(search.started_at)}</span>
                                     <span className="text-sm font-medium text-gray-700">{search.video_count}개 영상</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
                                     {statusBadge(search.status)}
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); deleteSearch(search.id, kw.id, kw.keyword); }}
-                                    className="ml-2 px-2 py-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                                    title="삭제"
-                                  >
-                                    🗑
-                                  </button>
-                                </div>
+                                    <span className="text-gray-300 text-sm">→</span>
+                                  </div>
+                                </button>
                               ))}
                             </div>
                           ) : (
@@ -1234,295 +1181,6 @@ export default function TikTokAnalyzerPage() {
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* ============================================================ */}
-        {/* Analytics Tab */}
-        {/* ============================================================ */}
-        {activeTab === 'analytics' && (
-          <div className="space-y-4">
-            {/* 키워드 + 날짜 선택 */}
-            <div className="bg-white rounded-2xl border p-4">
-              <h3 className="font-bold text-gray-900 mb-3">🔬 데이터 분석</h3>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  value={analyticsKeyword}
-                  onChange={async (e) => {
-                    setAnalyticsKeyword(e.target.value);
-                    setAnalyticsDate('');
-                    setAnalyticsData(null);
-                    if (e.target.value) {
-                      try {
-                        const res = await fetch(`${API_URL}/api/tiktok/analytics/dates/${encodeURIComponent(e.target.value)}`);
-                        const data = await res.json();
-                        if (data.success) setAnalyticsDates(data.data || []);
-                      } catch {}
-                    }
-                  }}
-                  className="px-3 py-2 border rounded-lg text-sm bg-white"
-                >
-                  <option value="">키워드 선택</option>
-                  {keywords.filter(k => k.is_active).map(k => (
-                    <option key={k.id} value={k.keyword}>{k.keyword}</option>
-                  ))}
-                </select>
-                <select
-                  value={analyticsDate}
-                  onChange={(e) => setAnalyticsDate(e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm bg-white"
-                  disabled={!analyticsKeyword}
-                >
-                  <option value="">날짜 선택</option>
-                  {analyticsDates.map(d => (
-                    <option key={d.date} value={d.date}>{d.date} ({d.search_count}회 · {d.total_videos}개)</option>
-                  ))}
-                </select>
-                <button
-                  onClick={async () => {
-                    if (!analyticsKeyword || !analyticsDate) return;
-                    setLoadingAnalytics(true);
-                    try {
-                      const res = await fetch(`${API_URL}/api/tiktok/analytics/${encodeURIComponent(analyticsKeyword)}/${analyticsDate}`);
-                      const data = await res.json();
-                      if (data.success) setAnalyticsData(data.data);
-                    } catch (err) { console.error(err); }
-                    finally { setLoadingAnalytics(false); }
-                  }}
-                  disabled={!analyticsKeyword || !analyticsDate || loadingAnalytics}
-                  className="px-4 py-2 bg-[#0F172A] text-white rounded-lg text-sm font-medium hover:bg-[#1e293b] transition disabled:opacity-50"
-                >
-                  {loadingAnalytics ? '분석 중...' : '📊 분석하기'}
-                </button>
-              </div>
-            </div>
-
-            {/* 정형 분석 결과 */}
-            {analyticsData && (
-              <div className="space-y-3">
-                {/* 수집 현황 */}
-                <div className="bg-white rounded-2xl border p-4">
-                  <h4 className="font-bold text-gray-800 mb-2">📋 수집 현황</h4>
-                  <p className="text-sm text-gray-600">
-                    {analyticsData.date} · {analyticsData.keyword} · {analyticsData.snapshotCount}회 수집
-                  </p>
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    {analyticsData.snapshots?.map((s: any) => (
-                      <span key={s.searchId} className="text-xs bg-gray-100 px-2 py-1 rounded">{s.time} ({s.videoCount}개)</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 좋아요 TOP 5 */}
-                {analyticsData.topLikes?.length > 0 && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">❤️ 좋아요 TOP 5</h4>
-                    <div className="space-y-2">
-                      {analyticsData.topLikes.map((v: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-[#0F172A] w-6">#{v.rank}</span>
-                            <span className="font-medium truncate">@{v.creator}</span>
-                          </div>
-                          <div className="flex gap-3 text-xs text-gray-500 flex-shrink-0">
-                            <span>❤️ {v.likes}</span>
-                            <span>👁 {v.views}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 조회수 TOP 5 */}
-                {analyticsData.topViews?.length > 0 && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">👁 조회수 TOP 5</h4>
-                    <div className="space-y-2">
-                      {analyticsData.topViews.map((v: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-[#0F172A] w-6">#{v.rank}</span>
-                            <span className="font-medium truncate">@{v.creator}</span>
-                          </div>
-                          <div className="flex gap-3 text-xs text-gray-500 flex-shrink-0">
-                            <span>👁 {v.views}</span>
-                            <span>❤️ {v.likes}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 신규 진입 */}
-                {analyticsData.newEntries?.length > 0 && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">🆕 신규 진입 ({analyticsData.newEntries.length}개)</h4>
-                    <div className="space-y-2">
-                      {analyticsData.newEntries.slice(0, 10).map((v: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 rounded-lg text-sm">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold text-emerald-700 w-6">#{v.rank}</span>
-                            <span className="font-medium truncate">@{v.creator}</span>
-                          </div>
-                          <div className="flex gap-3 text-xs text-gray-500 flex-shrink-0">
-                            <span>👁 {v.views}</span>
-                            <span>❤️ {v.likes}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 좋아요 급증 */}
-                {analyticsData.likesSpike?.length > 0 && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">🔥 좋아요 급증 ({analyticsData.likesSpike.length}개)</h4>
-                    <div className="space-y-2">
-                      {analyticsData.likesSpike.map((v: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-red-50 rounded-lg text-sm">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold w-6">#{v.rank}</span>
-                            <span className="font-medium truncate">@{v.creator}</span>
-                          </div>
-                          <span className="text-xs font-bold text-red-600 flex-shrink-0">+{v.changeRate}% ({v.prevLikes}→{v.likes})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 조회수 급증 */}
-                {analyticsData.viewsSpike?.length > 0 && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">📈 조회수 급증 ({analyticsData.viewsSpike.length}개)</h4>
-                    <div className="space-y-2">
-                      {analyticsData.viewsSpike.map((v: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg text-sm">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-bold w-6">#{v.rank}</span>
-                            <span className="font-medium truncate">@{v.creator}</span>
-                          </div>
-                          <span className="text-xs font-bold text-blue-600 flex-shrink-0">+{v.changeRate}% ({v.prevViews}→{v.views})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 크리에이터 빈도 */}
-                {analyticsData.creatorFrequency?.length > 0 && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">👤 다중 랭킹 크리에이터</h4>
-                    <div className="space-y-2">
-                      {analyticsData.creatorFrequency.map((c: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg text-sm">
-                          <span className="font-medium">@{c.name}</span>
-                          <span className="text-xs text-purple-600 font-bold">{c.count}개 영상 (#{c.ranks.join(', #')})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 수집 간 변동 */}
-                {analyticsData.intradayChanges && (
-                  <div className="bg-white rounded-2xl border p-4">
-                    <h4 className="font-bold text-gray-800 mb-2">🔄 당일 수집 간 변동</h4>
-                    <p className="text-sm text-gray-600">
-                      {analyticsData.intradayChanges.firstTime} → {analyticsData.intradayChanges.lastTime} |
-                      진입 {analyticsData.intradayChanges.entered}개 · 이탈 {analyticsData.intradayChanges.exited}개
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* AI 채팅 분석 */}
-            <div className="bg-white rounded-2xl border p-4">
-              <h4 className="font-bold text-gray-800 mb-3">🤖 AI 분석 채팅</h4>
-              <p className="text-xs text-gray-400 mb-3">
-                {analyticsKeyword && analyticsDate 
-                  ? `${analyticsKeyword} · ${analyticsDate} 데이터 기반으로 답변합니다` 
-                  : '키워드와 날짜를 선택하면 해당 데이터 기반으로 답변합니다'}
-              </p>
-
-              {/* 메시지 영역 */}
-              {aiMessages.length > 0 && (
-                <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
-                  {aiMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-3 rounded-xl text-sm whitespace-pre-wrap ${
-                        msg.role === 'user' 
-                          ? 'bg-[#0F172A] text-white' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {aiLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-gray-100 p-3 rounded-xl text-sm text-gray-400">분석 중...</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 빠른 질문 버튼 */}
-              {aiMessages.length === 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {[
-                    '특징적인 영상이 있어?',
-                    '좋아요가 급증한 영상은?',
-                    '어떤 크리에이터가 강세야?',
-                    '마케팅 인사이트 알려줘',
-                    '조회수 대비 좋아요 비율이 높은 영상은?',
-                  ].map(q => (
-                    <button
-                      key={q}
-                      onClick={() => {
-                        setAiQuestion(q);
-                        handleAiChat(q);
-                      }}
-                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-700 transition"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* 입력 */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(aiQuestion); }}
-                  placeholder="질문을 입력하세요..."
-                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                  disabled={aiLoading}
-                />
-                <button
-                  onClick={() => aiQuestion.trim() && handleAiChat(aiQuestion)}
-                  disabled={aiLoading || !aiQuestion.trim()}
-                  className="px-4 py-2 bg-[#1E9EDE] text-white rounded-lg text-sm font-medium hover:bg-[#1789c4] transition disabled:opacity-50"
-                >
-                  전송
-                </button>
-                {aiMessages.length > 0 && (
-                  <button
-                    onClick={() => setAiMessages([])}
-                    className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition"
-                  >
-                    초기화
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         )}
       </div>
