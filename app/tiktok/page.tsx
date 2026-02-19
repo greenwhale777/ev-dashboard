@@ -1533,7 +1533,7 @@ export default function TikTokAnalyzerPage() {
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-gray-400">수집된 TikTok 데이터를 AI가 자동으로 조회하고 분석합니다. 자유롭게 질문하세요.</p>
+              <p className="text-xs text-gray-700">수집된 TikTok 데이터를 AI가 자동으로 조회하고 분석합니다. 자유롭게 질문하세요.</p>
             </div>
 
             {/* 대화 이력 패널 */}
@@ -1624,7 +1624,7 @@ export default function TikTokAnalyzerPage() {
                   onChange={(e) => setAiQuestion(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(aiQuestion); }}
                   placeholder="무엇이든 질문하세요... (예: centella와 skin1004 영상 크리에이터 비교해줘)"
-                  className="flex-1 px-4 py-2.5 border rounded-xl text-sm"
+                  className="flex-1 px-4 py-2.5 border rounded-xl text-sm placeholder:text-gray-700"
                   disabled={aiLoading}
                 />
                 <button
