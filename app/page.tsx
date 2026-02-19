@@ -54,8 +54,9 @@ const botConfigs = {
   }
 };
 
-// 변경 이력 (수동 관리)
+// 변경 이력 (수동 관리 - changelog 배열에 직접 추가)
 const changelog = [
+  { date: '2/19', text: 'EV0 중앙관리 대시보드 개편' },
   { date: '2/18', text: 'AI 채팅 이력 아카이빙 추가' },
   { date: '2/18', text: 'DB 백업 자동화 (Google Drive)' },
   { date: '2/18', text: 'AI 분석 프롬프트 hallucination 방지' },
@@ -69,9 +70,9 @@ const changelog = [
 
 // 상태 뱃지
 function getStatusBadge(status: string | undefined) {
-  if (status === 'SUCCESS') return { label: '정상', bg: 'bg-emerald-50', text: 'text-emerald-600', dot: 'bg-emerald-500' };
-  if (status === 'ERROR') return { label: '오류', bg: 'bg-red-50', text: 'text-red-600', dot: 'bg-red-500' };
-  return { label: '대기', bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400' };
+  if (status === 'SUCCESS') return { label: '정상', bg: 'bg-emerald-50', text: 'text-emerald-600' };
+  if (status === 'ERROR') return { label: '오류', bg: 'bg-red-50', text: 'text-red-600' };
+  return { label: '대기', bg: 'bg-slate-100', text: 'text-slate-500' };
 }
 
 // 시간 포맷
@@ -122,21 +123,16 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // 봇별 최신 상태
-  const getLatestBotLog = (botId: string) => {
-    return logs.find(l => l.botId === botId);
-  };
-
   // EV 모듈별 상태 판단
   const getModuleStatus = (key: string) => {
     const config = botConfigs[key as keyof typeof botConfigs];
-    if ('comingSoon' in config && config.comingSoon) return { status: 'pending', label: '개발 중', color: 'text-slate-400' };
+    if ('comingSoon' in config && config.comingSoon) return { label: '개발 중', color: 'text-slate-400' };
     const botIds = config.bots.map((b: any) => b.id);
-    const latestLogs = botIds.map((id: string) => getLatestBotLog(id)).filter(Boolean);
-    if (latestLogs.length === 0) return { status: 'pending', label: '대기', color: 'text-slate-400' };
+    const latestLogs = botIds.map((id: string) => logs.find(l => l.botId === id)).filter(Boolean);
+    if (latestLogs.length === 0) return { label: '대기', color: 'text-slate-400' };
     const hasError = latestLogs.some(l => l!.status === 'ERROR');
-    if (hasError) return { status: 'error', label: '오류', color: 'text-red-500' };
-    return { status: 'ok', label: '정상', color: 'text-emerald-500' };
+    if (hasError) return { label: '오류', color: 'text-red-500' };
+    return { label: '정상', color: 'text-emerald-500' };
   };
 
   // 필터된 로그
@@ -155,19 +151,22 @@ export default function Dashboard() {
       `}</style>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        {/* 헤더 */}
+        {/* 헤더 - 클릭 시 메인(EV0)으로 복귀 */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActiveTab(null)}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
+              >
                 <div className="w-10 h-10 bg-[#0F172A] rounded-xl flex items-center justify-center">
                   <span className="text-white font-bold text-lg">EV</span>
                 </div>
-                <div>
+                <div className="text-left">
                   <h1 className="text-xl font-bold text-slate-900">EV System Dashboard</h1>
                   <p className="text-sm text-slate-500">ASCENDERZ Elevator Framework</p>
                 </div>
-              </div>
+              </button>
               <div className="flex items-center gap-4">
                 {lastUpdate && (
                   <span className="text-xs text-slate-400">
@@ -211,63 +210,80 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 시스템 상태 카드 */}
+              {/* 시스템 상태 카드 - 일관된 봇 목록 표시 */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* EV1 */}
                 <div className="bg-white/10 backdrop-blur rounded-xl p-3.5">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-300">📦 EV1</span>
                     <span className={`text-xs font-semibold ${getModuleStatus('ev1').color}`}>{getModuleStatus('ev1').label}</span>
                   </div>
-                  <p className="text-xs text-slate-400">재고 관리</p>
+                  <p className="text-[11px] text-slate-500">봇 없음 (개발 중)</p>
                 </div>
+
+                {/* EV2 */}
                 <div className="bg-white/10 backdrop-blur rounded-xl p-3.5">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-300">🔍 EV2</span>
                     <span className={`text-xs font-semibold ${getModuleStatus('ev2').color}`}>{getModuleStatus('ev2').label}</span>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    {botStatus['tiktok-analyzer'] ? `TikTok ${formatTime(botStatus['tiktok-analyzer']?.endTime)}` : '생산성 봇'}
-                  </p>
+                  <div className="space-y-0.5">
+                    {botConfigs.ev2.bots.map(b => (
+                      <p key={b.id} className="text-[11px] text-slate-500">· {b.name}</p>
+                    ))}
+                  </div>
                 </div>
+
+                {/* EV3 */}
                 <div className="bg-white/10 backdrop-blur rounded-xl p-3.5">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-300">💼 EV3</span>
                     <span className={`text-xs font-semibold ${getModuleStatus('ev3').color}`}>{getModuleStatus('ev3').label}</span>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    {botStatus['cash-bot'] ? `캐시 ${formatTime(botStatus['cash-bot']?.endTime)}` : '백오피스'}
-                  </p>
+                  <div className="space-y-0.5">
+                    {botConfigs.ev3.bots.map(b => (
+                      <p key={b.id} className="text-[11px] text-slate-500">· {b.name}</p>
+                    ))}
+                  </div>
                 </div>
+
+                {/* 백업 */}
                 <div className="bg-white/10 backdrop-blur rounded-xl p-3.5">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-300">💾 백업</span>
                     <span className="text-xs font-semibold text-emerald-400">자동</span>
                   </div>
-                  <p className="text-xs text-slate-400">매일 03:00 · Google Drive</p>
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] text-slate-500">· 매일 12:30 실행</p>
+                    <p className="text-[11px] text-slate-500">· Google Drive 저장</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* 하위 모듈 탭 */}
+            {/* 하위 모듈 탭 - 호버 효과 강화 */}
             <div className="flex gap-2 mb-6">
-              {Object.entries(botConfigs).map(([key, config]) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(activeTab === key ? null : key as any)}
-                  style={{
-                    backgroundColor: activeTab === key ? config.color : 'white',
-                    color: activeTab === key ? '#FFFFFF' : '#475569',
-                    borderColor: activeTab === key ? config.color : '#E2E8F0',
-                  }}
-                  className="flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer hover:opacity-90 active:scale-[0.98] border whitespace-nowrap flex items-center justify-center gap-2 text-sm"
-                >
-                  <span>{config.icon}</span>
-                  <span>{config.title.split(' - ')[0]}</span>
-                  {'comingSoon' in config && config.comingSoon && (
-                    <span className="text-[10px] bg-black/10 px-1.5 py-0.5 rounded">개발 중</span>
-                  )}
-                </button>
-              ))}
+              {Object.entries(botConfigs).map(([key, config]) => {
+                const isActive = activeTab === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(isActive ? null : key as any)}
+                    className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer active:scale-[0.98] border whitespace-nowrap flex items-center justify-center gap-2 text-sm
+                      ${isActive
+                        ? 'text-white shadow-lg scale-[1.02]'
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-700 hover:shadow-md'
+                      }`}
+                    style={isActive ? { backgroundColor: config.color, borderColor: config.color } : {}}
+                  >
+                    <span>{config.icon}</span>
+                    <span>{config.title.split(' - ')[0]}</span>
+                    {'comingSoon' in config && config.comingSoon && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-white/20' : 'bg-slate-100'}`}>개발 중</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* ============================================================ */}
@@ -285,12 +301,20 @@ export default function Dashboard() {
 
             {activeTab === 'ev2' && (
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">🔍</span>
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900">EV2 - 생산성 봇</h2>
-                    <p className="text-xs text-slate-500">데이터 수집 및 분석 자동화</p>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🔍</span>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">EV2 - 생산성 봇</h2>
+                      <p className="text-xs text-slate-500">데이터 수집 및 분석 자동화</p>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setActiveTab(null)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition"
+                  >
+                    ← 메인
+                  </button>
                 </div>
                 <div className="space-y-3">
                   {botConfigs.ev2.bots.map((bot) => {
@@ -322,12 +346,20 @@ export default function Dashboard() {
 
             {activeTab === 'ev3' && (
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">💼</span>
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900">EV3 - 백오피스</h2>
-                    <p className="text-xs text-slate-500">회계 및 재무 자동화</p>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">💼</span>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">EV3 - 백오피스</h2>
+                      <p className="text-xs text-slate-500">회계 및 재무 자동화</p>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setActiveTab(null)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 transition"
+                  >
+                    ← 메인
+                  </button>
                 </div>
                 <div className="space-y-3">
                   {botConfigs.ev3.bots.map((bot) => {
@@ -370,7 +402,7 @@ export default function Dashboard() {
             )}
 
             {/* ============================================================ */}
-            {/* 통합 로그 + 변경 이력 (2컬럼) */}
+            {/* 통합 로그 + 사이드바 (2컬럼) */}
             {/* ============================================================ */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* 통합 로그 (2/3) */}
@@ -438,6 +470,7 @@ export default function Dashboard() {
 
               {/* 사이드바 (1/3) */}
               <div className="space-y-4">
+                {/* 최근 변경 이력 */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                   <h3 className="font-bold text-slate-900 mb-3">🚀 최근 변경 이력</h3>
                   <div className="space-y-2">
@@ -451,6 +484,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* DB 정보 */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                   <h3 className="font-bold text-slate-900 mb-3">🗄️ 데이터베이스</h3>
                   <div className="space-y-2 text-xs">
@@ -460,7 +494,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100">
                       <span className="text-slate-400">백업 주기</span>
-                      <span className="text-slate-700 font-medium">매일 03:00</span>
+                      <span className="text-slate-700 font-medium">매일 12:30</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100">
                       <span className="text-slate-400">백업 위치</span>
