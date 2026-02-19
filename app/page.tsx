@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 // API 서버 URL
 const API_URL = process.env.NEXT_PUBLIC_EV0_API_URL || 'https://ev0-agent-production.up.railway.app';
+const TIKTOK_API_URL = process.env.NEXT_PUBLIC_TIKTOK_API_URL || 'https://ev2-tiktok-analyzer-production.up.railway.app';
 
 interface ExecutionLog {
   botId: string;
@@ -59,7 +60,7 @@ const botConfigs = {
 
 // 변경 이력
 const changelog = [
-  { date: '2/19', text: 'EV0 중앙관리 대시보드 개편' },
+  { date: '2/19', text: 'EV0 대시보드 개편 + TikTok 로그 연동' },
   { date: '2/18', text: 'AI 채팅 이력 아카이빙 추가' },
   { date: '2/18', text: 'DB 백업 자동화 (Google Drive)' },
   { date: '2/18', text: 'AI 분석 프롬프트 hallucination 방지' },
@@ -89,6 +90,24 @@ function formatTime(isoString: string | undefined) {
   return `${month}/${day} ${hours}:${minutes}`;
 }
 
+// tiktok_searches → ExecutionLog 변환
+function convertTikTokSearchToLog(search: any): ExecutionLog {
+  const isSuccess = search.status === 'completed';
+  const keyword = search.keyword || '';
+  const videoCount = search.video_count || 0;
+  return {
+    botId: 'tiktok-analyzer',
+    botName: 'TikTok 분석',
+    status: isSuccess ? 'SUCCESS' : 'ERROR',
+    startTime: search.started_at || search.completed_at,
+    endTime: search.completed_at || search.started_at,
+    duration: '',
+    message: isSuccess
+      ? `"${keyword}" ${videoCount}개 수집 완료`
+      : `"${keyword}" ${search.error || '수집 실패'}`,
+  };
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'ev1' | 'ev2' | 'ev3' | null>(null);
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
@@ -102,15 +121,45 @@ export default function Dashboard() {
   const fetchLogs = async () => {
     try {
       setApiError(null);
-      const logsRes = await fetch(`${API_URL}/api/logs`);
-      const logsData = await logsRes.json();
-      setLogs(logsData);
 
+      // EV0 로그 가져오기
+      const logsRes = await fetch(`${API_URL}/api/logs`);
+      const logsData: ExecutionLog[] = await logsRes.json();
+
+      // TikTok 로그 가져오기 (tiktok_searches API)
+      let tiktokLogs: ExecutionLog[] = [];
+      try {
+        const tiktokRes = await fetch(`${TIKTOK_API_URL}/api/tiktok/searches?limit=30`);
+        const tiktokData = await tiktokRes.json();
+        if (tiktokData.success && tiktokData.data) {
+          tiktokLogs = tiktokData.data
+            .filter((s: any) => s.status === 'completed' || s.status === 'error')
+            .map(convertTikTokSearchToLog);
+        }
+      } catch (e) {
+        console.warn('TikTok 로그 조회 실패:', e);
+      }
+
+      // 합치고 시간순 정렬 (최신 먼저)
+      const allLogs = [...logsData, ...tiktokLogs].sort((a, b) => {
+        const timeA = new Date(a.endTime || a.startTime).getTime();
+        const timeB = new Date(b.endTime || b.startTime).getTime();
+        return timeB - timeA;
+      });
+
+      setLogs(allLogs);
+
+      // 봇 상태
       const statusRes = await fetch(`${API_URL}/api/status`);
       if (!statusRes.ok) throw new Error('상태 조회 실패');
       const statusData = await statusRes.json();
-      setBotStatus(statusData);
 
+      // TikTok 최신 상태 추가
+      if (tiktokLogs.length > 0) {
+        statusData['tiktok-analyzer'] = tiktokLogs[0];
+      }
+
+      setBotStatus(statusData);
       setLastUpdate(new Date());
       setLoading(false);
     } catch (e) {
@@ -161,7 +210,6 @@ export default function Dashboard() {
 
     return (
       <div className="space-y-4">
-        {/* 봇 카드 */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -198,13 +246,7 @@ export default function Dashboard() {
                       )}
                     </div>
                     {'link' in bot && bot.link && (
-                      <a
-                        href={bot.link}
-                        className="px-3.5 py-2 text-white text-xs font-semibold rounded-lg transition-all active:scale-95"
-                        style={{ backgroundColor: config.color }}
-                      >
-                        열기 →
-                      </a>
+                      <a href={bot.link} className="px-3.5 py-2 text-white text-xs font-semibold rounded-lg transition-all active:scale-95" style={{ backgroundColor: config.color }}>열기 →</a>
                     )}
                   </div>
                   {status?.message && (
@@ -250,7 +292,7 @@ export default function Dashboard() {
       `}</style>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        {/* 헤더 - 로고 클릭 시 메인 복귀 */}
+        {/* 헤더 */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
@@ -269,12 +311,7 @@ export default function Dashboard() {
                     마지막 업데이트: {lastUpdate.toLocaleTimeString('ko-KR')}
                   </span>
                 )}
-                <button
-                  onClick={fetchLogs}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-all cursor-pointer active:scale-95"
-                >
-                  🔄 새로고침
-                </button>
+                <button onClick={fetchLogs} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-all cursor-pointer active:scale-95">🔄 새로고침</button>
               </div>
             </div>
           </div>
@@ -341,7 +378,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 하위 모듈 탭 (항상 표시) */}
+          {/* 하위 모듈 탭 */}
           <div className="flex gap-2 mb-6">
             {Object.entries(botConfigs).map(([key, config]) => {
               const isActive = activeTab === key;
@@ -366,10 +403,7 @@ export default function Dashboard() {
             })}
           </div>
 
-          {/* ============================================================ */}
-          {/* 모듈별 상세 뷰 (EV1/2/3 선택 시) */}
-          {/* ============================================================ */}
-
+          {/* 모듈별 상세 뷰 */}
           {activeTab === 'ev1' && (
             <div className="space-y-4">
               <div className="bg-white rounded-2xl border border-slate-200 p-10 shadow-sm text-center">
@@ -383,16 +417,12 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
           {activeTab === 'ev2' && renderModuleDetail('ev2')}
           {activeTab === 'ev3' && renderModuleDetail('ev3')}
 
-          {/* ============================================================ */}
-          {/* 메인 뷰 (아무 탭도 선택 안 했을 때) */}
-          {/* ============================================================ */}
+          {/* 메인 뷰 */}
           {activeTab === null && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* 통합 로그 (2/3) */}
               <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-900">📋 통합 실행 로그</h3>
@@ -441,7 +471,7 @@ export default function Dashboard() {
                   ) : filteredLogs.length === 0 ? (
                     <div className="text-center py-8 text-slate-400 text-sm">실행 기록이 없습니다</div>
                   ) : (
-                    filteredLogs.slice(0, 30).map((log, i) => (
+                    filteredLogs.slice(0, 50).map((log, i) => (
                       <div key={i} className="flex items-center gap-2.5 text-xs py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                         <span className="text-slate-400 w-20 flex-shrink-0">{formatTime(log.endTime)}</span>
                         <span className={`font-semibold px-1.5 py-0.5 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
@@ -455,7 +485,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 사이드바 (1/3) */}
               <div className="space-y-4">
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                   <h3 className="font-bold text-slate-900 mb-3">🚀 최근 변경 이력</h3>
