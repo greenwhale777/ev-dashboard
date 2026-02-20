@@ -141,7 +141,7 @@ export default function Dashboard() {
       // TikTok 로그 가져오기
       let tiktokLogs: ExecutionLog[] = [];
       try {
-        const tiktokRes = await fetch(`${TIKTOK_API_URL}/api/tiktok/searches?limit=30`);
+        const tiktokRes = await fetch(`${TIKTOK_API_URL}/api/tiktok/searches?limit=100`);
         if (tiktokRes.ok) {
           const tiktokData = await tiktokRes.json();
           if (tiktokData.success && Array.isArray(tiktokData.data)) {
@@ -264,7 +264,7 @@ export default function Dashboard() {
             {moduleLogs.length === 0 ? (
               <div className="text-center py-6 text-slate-400 text-sm">실행 기록이 없습니다</div>
             ) : (
-              moduleLogs.slice(0, 20).map((log, i) => (
+              moduleLogs.slice(0, 50).map((log, i) => (
                 <div key={i} className="flex items-center gap-2.5 text-xs py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                   <span className="text-slate-400 w-20 flex-shrink-0">{formatTime(log.endTime)}</span>
                   <span className={`font-semibold px-1.5 py-0.5 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
@@ -445,7 +445,7 @@ export default function Dashboard() {
                   ) : filteredLogs.length === 0 ? (
                     <div className="text-center py-8 text-slate-400 text-sm">실행 기록이 없습니다</div>
                   ) : (
-                    filteredLogs.slice(0, 40).map((log, i) => (
+                    filteredLogs.slice(0, 100).map((log, i) => (
                       <div key={i} className="flex items-center gap-2.5 text-xs py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                         <span className="text-slate-400 w-20 flex-shrink-0">{formatTime(log.endTime)}</span>
                         <span className={`font-semibold px-1.5 py-0.5 rounded ${log.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
