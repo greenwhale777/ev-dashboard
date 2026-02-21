@@ -1592,31 +1592,34 @@ export default function TikTokAnalyzerPage() {
               )}
 
               {/* 입력 */}
-              <div className="flex gap-2">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 mt-4">
+                <p className="text-xs font-semibold text-blue-600 mb-2">💬 AI에게 질문하기</p>
+                <div className="flex gap-2">
                 <input
                   type="text"
                   value={aiQuestion}
                   onChange={(e) => setAiQuestion(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(aiQuestion); }}
                   placeholder="무엇이든 질문하세요... (예: centella와 skin1004 영상 크리에이터 비교해줘)"
-                  className="flex-1 px-4 py-2.5 border rounded-xl text-sm placeholder:text-gray-700"
+                  className="flex-1 px-4 py-3 border-2 border-blue-300 bg-white rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   disabled={aiLoading}
                 />
                 <button
                   onClick={() => aiQuestion.trim() && handleAiChat(aiQuestion)}
                   disabled={aiLoading || !aiQuestion.trim()}
-                  className="px-5 py-2.5 bg-[#0F172A] text-white rounded-xl text-sm font-medium hover:bg-[#1e293b] transition disabled:opacity-50"
+                  className="px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
                 >
-                  {aiLoading ? '분석 중...' : '전송'}
+                  {aiLoading ? '분석 중...' : '🚀 전송'}
                 </button>
                 {aiMessages.length > 0 && (
                   <button
                     onClick={startNewAiChat}
-                    className="px-3 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
+                    className="px-3 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
                   >
                     새 대화
                   </button>
                 )}
+                </div>
               </div>
             </div>
           </div>
