@@ -162,7 +162,7 @@ export default function TikTokAnalyzerPage() {
   const [keywordSearches, setKeywordSearches] = useState<Record<number, TikTokSearch[]>>({});
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily' | 'analytics' | 'ai'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'keywords' | 'daily' | 'analytics' | 'ai'>('keywords');
 
   // Daily Report state
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([]);
@@ -300,6 +300,8 @@ export default function TikTokAnalyzerPage() {
 
   useEffect(() => {
     fetchKeywords();
+    const interval = setInterval(fetchKeywords, 30000);
+    return () => clearInterval(interval);
   }, [fetchKeywords]);
 
   // ============================================================
@@ -554,6 +556,8 @@ export default function TikTokAnalyzerPage() {
   useEffect(() => {
     if (activeTab === 'daily') {
       fetchDailyReports();
+      const interval = setInterval(fetchDailyReports, 30000);
+      return () => clearInterval(interval);
     }
   }, [activeTab, fetchDailyReports]);
 
@@ -700,42 +704,13 @@ export default function TikTokAnalyzerPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {/* Search Bar */}
-        <div className="bg-white rounded-2xl border shadow-sm p-4 sm:p-6 mb-6">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="검색 키워드 입력 (예: 메디큐브 PDRN)"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !isSearching && startSearch(searchKeyword)}
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1E9EDE]/30 focus:border-[#1E9EDE]"
-              disabled={isSearching}
-            />
-            <button
-              onClick={() => startSearch(searchKeyword)}
-              disabled={isSearching || !searchKeyword.trim()}
-              className="px-4 sm:px-6 py-3 bg-[#1E9EDE] text-white rounded-xl font-semibold text-sm hover:bg-[#1789c4] transition disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 whitespace-nowrap"
-            >
-              {isSearching ? '요청 중...' : '🔍 검색'}
-            </button>
-          </div>
-
-          {error && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              ❌ {error}
-            </div>
-          )}
-        </div>
-
         {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto">
           {[
-            { key: 'search', label: '📊 검색 결과', count: videos.length },
             { key: 'keywords', label: '🏷️ 키워드 관리', count: keywords.length },
             { key: 'daily', label: '📅 Daily Report', count: dailyReports.length },
-            { key: 'analytics', label: '🔬 분석', count: null },
             { key: 'ai', label: '🤖 AI 채팅', count: null },
+            { key: 'search', label: '📊 검색 결과', count: videos.length },
           ].map((tab) => (
             <button
               key={tab.key}
