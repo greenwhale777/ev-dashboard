@@ -57,6 +57,11 @@ const botConfigs = {
 };
 
 const changelog = [
+  { date: '2/22', text: '새 PC 마이그레이션 (24시간 가동 환경 구축)' },
+  { date: '2/21', text: 'TikTok 대시보드 UI 개편 (탭 재구성, 자동 갱신, AI 채팅 강화)' },
+  { date: '2/21', text: '스크롤 패턴 최적화 + 봇 감지 회피 개선' },
+  { date: '2/21', text: 'EV0 로그 확대 (TikTok 100개, 모듈 50개, 통합 100개)' },
+  { date: '2/21', text: 'AI 채팅 영상 추천 시 URL 필수 포함' },
   { date: '2/19', text: 'EV0 대시보드 개편 + TikTok 로그 연동' },
   { date: '2/18', text: 'AI 채팅 이력 아카이빙 추가' },
   { date: '2/18', text: 'DB 백업 자동화 (Google Drive)' },
