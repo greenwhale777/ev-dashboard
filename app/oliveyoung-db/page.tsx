@@ -314,8 +314,7 @@ export default function OliveyoungDBPage() {
   const renderMarkdown = (text: string) => {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/
-/g, '<br/>');
+      .replace(/\n/g, '<br/>');
   };
 
   const safeString = (val: any): string => {
