@@ -111,6 +111,9 @@ export default function EV2Page() {
   const [showAiHistory, setShowAiHistory] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // ── 제품 탐색 내 개별 분석 ──
+  const [analyzingProductId, setAnalyzingProductId] = useState<number | null>(null);
+
   // ── 개별 분석 ──
   const [url, setUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
@@ -195,6 +198,54 @@ export default function EV2Page() {
     }
     setDetailLoading(false);
   }, []);
+
+  // ============================================================
+  // 제품 탐색 내 개별 분석
+  // ============================================================
+  const analyzeProduct = async (product: Product) => {
+    setAnalyzingProductId(product.id);
+    try {
+      const startRes = await fetch(`${API_URL}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: product.product_url })
+      });
+      const startData = await startRes.json();
+      if (!startData.success) throw new Error(startData.message || '분석 시작 실패');
+
+      const analysisId = startData.analysisId;
+
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${API_URL}/api/analyze/${analysisId}/status`);
+          const statusData = await statusRes.json();
+
+          if (statusData.status === 'completed') {
+            clearInterval(poll);
+            setAnalyzingProductId(null);
+            fetchProducts();
+          } else if (statusData.status === 'failed') {
+            clearInterval(poll);
+            setAnalyzingProductId(null);
+            alert(`분석 실패: ${statusData.error || '알 수 없는 오류'}`);
+          }
+        } catch (e) {
+          console.error('분석 상태 조회 오류:', e);
+        }
+      }, 3000);
+
+      setTimeout(() => {
+        clearInterval(poll);
+        if (analyzingProductId === product.id) {
+          setAnalyzingProductId(null);
+          alert('분석 시간이 초과했습니다.');
+        }
+      }, 180000);
+    } catch (err: any) {
+      setAnalyzingProductId(null);
+      alert(err.message || '분석 시작 실패');
+    }
+  };
 
   // ============================================================
   // Batch Actions
@@ -425,7 +476,9 @@ export default function EV2Page() {
       analyzing: { bg: 'bg-blue-100', text: 'text-blue-700', label: '분석 중' },
       collecting: { bg: 'bg-amber-100', text: 'text-amber-700', label: '수집 중' },
       failed: { bg: 'bg-red-100', text: 'text-red-700', label: '실패' },
+      stopped: { bg: 'bg-orange-100', text: 'text-orange-700', label: '중지됨' },
       pending: { bg: 'bg-gray-100', text: 'text-gray-600', label: '대기' },
+      unanalyzed: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '미분석' },
     };
     const s = map[status || ''] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '미수집' };
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>{s.label}</span>;
@@ -472,34 +525,34 @@ export default function EV2Page() {
   // ============================================================
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push('/')}
-                className="w-9 h-9 bg-[#0F172A] rounded-xl flex items-center justify-center hover:bg-[#1E293B] transition-all cursor-pointer active:scale-90 hover:scale-105"
-              >
-                <span className="text-white font-bold text-sm">EV</span>
-              </button>
-              <div>
-                <h1 className="text-lg font-bold text-[#0F172A]">EV2 - 올리브영 분석</h1>
-                <p className="text-xs text-gray-500">카테고리별 상세페이지 분석 + AI 검색 + 개별 분석</p>
+      {/* Header + Tabs (sticky block) */}
+      <div className="sticky top-0 z-10">
+        <div className="bg-white border-b">
+          <div className="max-w-6xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/')}
+                  className="w-9 h-9 bg-[#0F172A] rounded-xl flex items-center justify-center hover:bg-[#1E293B] transition-all cursor-pointer active:scale-90 hover:scale-105"
+                >
+                  <span className="text-white font-bold text-sm">EV</span>
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-[#0F172A]">EV2 - 올리브영 분석</h1>
+                  <p className="text-xs text-gray-500">카테고리별 상세페이지 분석 + AI 검색 + 개별 분석</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full font-medium">
-                {categories.reduce((sum, c) => sum + c.analyzedCount, 0)}개 분석완료
-              </span>
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full font-medium">
+                  {categories.reduce((sum, c) => sum + c.analyzedCount, 0)}개 분석완료
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 py-4">
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
+        <div className="bg-[#F8FAFC] border-b border-slate-200">
+          <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
+            <div className="flex gap-2 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -515,8 +568,12 @@ export default function EV2Page() {
               )}
             </button>
           ))}
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto px-4 py-4">
         {/* ============================================================ */}
         {/* DB 현황 탭 */}
         {/* ============================================================ */}
@@ -526,7 +583,26 @@ export default function EV2Page() {
               <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-bold text-blue-900">⏳ 배치 수집 진행 중</h3>
-                  {statusBadge(activeBatch.status)}
+                  <div className="flex items-center gap-2">
+                    {statusBadge(activeBatch.status)}
+                    <button
+                      onClick={async () => {
+                        if (!confirm('배치 수집을 중지하시겠습니까?')) return;
+                        try {
+                          await fetch(`${API_URL}/api/oy/batch/${activeBatch.id}/stop`, { method: 'POST' });
+                          setBatchPolling(false);
+                          setActiveBatch(prev => prev ? { ...prev, status: 'stopped' } : null);
+                          fetchCategories();
+                          fetchBatchJobs();
+                        } catch (e) {
+                          alert('중지 요청 실패');
+                        }
+                      }}
+                      className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition"
+                    >
+                      ⏹ 중지
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -567,7 +643,15 @@ export default function EV2Page() {
                         <p className="font-medium text-sm text-gray-900">{cat.smallCategory}</p>
                         <p className="text-xs text-gray-400">{cat.bigCategory} &gt; {cat.midCategory}</p>
                       </div>
-                      {statusBadge(cat.latestBatchStatus)}
+                      {statusBadge(
+                        cat.latestBatchStatus
+                          ? cat.latestBatchStatus
+                          : cat.analyzedCount > 0
+                            ? 'completed'
+                            : cat.productCount > 0
+                              ? 'unanalyzed'
+                              : null
+                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex gap-3 text-xs text-gray-500">
@@ -797,7 +881,27 @@ export default function EV2Page() {
                         {p.analysis_status === 'completed' ? (
                           <span className="text-xs text-emerald-600">✅ {p.total_blocks}블록</span>
                         ) : (
-                          <span className="text-xs text-gray-400">미분석</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); analyzeProduct(p); }}
+                              disabled={analyzingProductId !== null}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                                analyzingProductId === p.id
+                                  ? 'bg-blue-100 text-blue-600'
+                                  : analyzingProductId !== null
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                              }`}
+                            >
+                              {analyzingProductId === p.id ? (
+                                <span className="flex items-center gap-1">
+                                  <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                                  분석 중...
+                                </span>
+                              ) : '분석'}
+                            </button>
+                            <span className="text-xs text-gray-400">미분석</span>
+                          </div>
                         )}
                         <span className="text-gray-300">›</span>
                       </div>
