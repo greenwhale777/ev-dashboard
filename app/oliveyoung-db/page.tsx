@@ -45,6 +45,7 @@ interface Product {
   analysis_status: string | null;
   total_blocks: number;
   image_count: number;
+  processing_time: number | null;
   analyzed_at: string | null;
 }
 
@@ -653,7 +654,10 @@ export default function OliveyoungDBPage() {
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0 ml-4">
                         {p.analysis_status === 'completed' ? (
-                          <span className="text-xs text-emerald-600">✅ {p.total_blocks}블록</span>
+                          <div className="text-right">
+                            <span className="text-xs text-emerald-600">✅ {p.total_blocks}블록 · {p.processing_time ? `${Math.floor(p.processing_time / 60)}분${p.processing_time % 60}초` : ''}</span>
+                            {p.analyzed_at && <p className="text-[10px] text-gray-400">{new Date(p.analyzed_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>}
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-400">미분석</span>
                         )}
