@@ -96,6 +96,8 @@ export default function EV2Page() {
   const [productTotal, setProductTotal] = useState(0);
   const [productFilter, setProductFilter] = useState({ category: '', brand: '', search: '' });
   const [productLoading, setProductLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   // ── 제품 상세 ──
   const [selectedProduct, setSelectedProduct] = useState<ProductDetail | null>(null);
@@ -170,7 +172,8 @@ export default function EV2Page() {
       if (productFilter.category) params.set('category', productFilter.category);
       if (productFilter.brand) params.set('brand', productFilter.brand);
       if (productFilter.search) params.set('search', productFilter.search);
-      params.set('limit', '50');
+      params.set('limit', String(pageSize));
+      params.set('offset', String((currentPage - 1) * pageSize));
 
       const res = await fetch(`${API_URL}/api/oy/products?${params}`);
       const data = await res.json();
@@ -182,7 +185,7 @@ export default function EV2Page() {
       console.error('Failed to fetch products:', e);
     }
     setProductLoading(false);
-  }, [productFilter]);
+  }, [productFilter, currentPage]);
 
   const fetchProductDetail = useCallback(async (productId: number) => {
     setDetailLoading(true);
@@ -437,7 +440,7 @@ export default function EV2Page() {
 
   useEffect(() => {
     if (activeTab === 'products') fetchProducts();
-  }, [activeTab, productFilter]);
+  }, [activeTab, productFilter, currentPage]);
 
   useEffect(() => {
     if (activeTab === 'analyze') fetchAnalyzeResults();
@@ -822,7 +825,7 @@ export default function EV2Page() {
               <div className="flex flex-wrap gap-3">
                 <select
                   value={productFilter.category}
-                  onChange={(e) => setProductFilter(prev => ({ ...prev, category: e.target.value }))}
+                  onChange={(e) => { setProductFilter(prev => ({ ...prev, category: e.target.value })); setCurrentPage(1); }}
                   className="px-3 py-2 border rounded-lg text-sm bg-white"
                 >
                   <option value="">전체 카테고리</option>
@@ -835,14 +838,14 @@ export default function EV2Page() {
                 <input
                   type="text"
                   value={productFilter.brand}
-                  onChange={(e) => setProductFilter(prev => ({ ...prev, brand: e.target.value }))}
+                  onChange={(e) => { setProductFilter(prev => ({ ...prev, brand: e.target.value })); setCurrentPage(1); }}
                   placeholder="브랜드명..."
                   className="px-3 py-2 border rounded-lg text-sm w-40"
                 />
                 <input
                   type="text"
                   value={productFilter.search}
-                  onChange={(e) => setProductFilter(prev => ({ ...prev, search: e.target.value }))}
+                  onChange={(e) => { setProductFilter(prev => ({ ...prev, search: e.target.value })); setCurrentPage(1); }}
                   placeholder="상품명 검색..."
                   className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[200px]"
                 />
@@ -856,8 +859,15 @@ export default function EV2Page() {
             </div>
 
             <div className="bg-white rounded-2xl border">
-              <div className="p-4 border-b">
-                <span className="text-sm text-gray-500">총 {productTotal}개 제품</span>
+              <div className="p-4 border-b flex items-center justify-between">
+                <span className="text-sm text-gray-500">
+                  총 {productTotal}개 제품 ({Math.ceil(productTotal / pageSize)}페이지)
+                </span>
+                {productTotal > 0 && (
+                  <span className="text-xs text-gray-400">
+                    {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, productTotal)}번째
+                  </span>
+                )}
               </div>
               {productLoading ? (
                 <div className="p-8 text-center text-gray-400">로딩 중...</div>
@@ -912,6 +922,65 @@ export default function EV2Page() {
                 <div className="p-8 text-center text-gray-400">검색 결과가 없습니다</div>
               )}
             </div>
+
+            {/* Pagination */}
+            {productTotal > pageSize && (() => {
+              const totalPages = Math.ceil(productTotal / pageSize);
+              const getPageNumbers = () => {
+                const pages: (number | string)[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentPage > 4) pages.push('...');
+                  const start = Math.max(2, currentPage - 2);
+                  const end = Math.min(totalPages - 1, currentPage + 2);
+                  for (let i = start; i <= end; i++) pages.push(i);
+                  if (currentPage < totalPages - 3) pages.push('...');
+                  pages.push(totalPages);
+                }
+                return pages;
+              };
+              return (
+                <div className="flex items-center justify-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                      currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100 cursor-pointer'
+                    }`}
+                  >
+                    ← 이전
+                  </button>
+                  {getPageNumbers().map((page, idx) =>
+                    typeof page === 'string' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 py-1.5 text-sm text-gray-400">...</span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition cursor-pointer ${
+                          page === currentPage
+                            ? 'bg-[#0F172A] text-white'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                      currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100 cursor-pointer'
+                    }`}
+                  >
+                    다음 →
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         )}
 
