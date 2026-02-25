@@ -560,7 +560,7 @@ export default function OliveyoungDBPage() {
                     '세라마이드 포함 제품 전체 조회',
                     '메이크프렘 vs 라운드랩 클렌징 비교',
                     'DB 현황 요약해줘',
-                    '콩단백질 포함 제품이 있어?',
+                    '비건 인증 제품 찾아줘',
                     '클렌징밀크 TOP5 핵심 성분 비교',
                   ].map(q => (
                     <button
@@ -733,15 +733,32 @@ export default function OliveyoungDBPage() {
 
                     {essentialsExpanded && (
                       <div className="mt-4 space-y-4">
-                        {/* 효능 포인트 */}
+                        {/* 메인 카피 */}
+                        {selectedProduct.product_essentials?.mainCopy && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">🎯 메인 카피</h4>
+                            <p className="text-sm font-bold text-gray-900 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 rounded-lg border border-emerald-200">
+                              &ldquo;{selectedProduct.product_essentials.mainCopy}&rdquo;
+                            </p>
+                          </div>
+                        )}
+
+                        {/* 핵심 포인트 */}
                         {selectedProduct.efficacy_points?.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2">💪 효능 포인트</h4>
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">💪 핵심 포인트</h4>
                             <div className="space-y-2">
                               {selectedProduct.efficacy_points.map((p: any, i: number) => (
                                 <div key={i} className="bg-emerald-50 p-3 rounded-lg">
-                                  <p className="font-medium text-sm text-emerald-800">Point {p.pointNumber}: {p.headline}</p>
+                                  <p className="font-medium text-sm text-emerald-800">핵심 {p.pointNumber || i+1}: {p.headline}</p>
                                   {p.subCopy && <p className="text-xs text-emerald-600 mt-0.5">{p.subCopy}</p>}
+                                  {p.details?.length > 0 && (
+                                    <div className="mt-1 space-y-0.5">
+                                      {p.details.map((d: string, j: number) => (
+                                        <p key={j} className="text-xs text-gray-500">• {d}</p>
+                                      ))}
+                                    </div>
+                                  )}
                                   {p.clinicalNote && <p className="text-xs text-gray-500 mt-1">📋 {p.clinicalNote}</p>}
                                 </div>
                               ))}
@@ -763,10 +780,10 @@ export default function OliveyoungDBPage() {
                           </div>
                         )}
 
-                        {/* 안전성 테스트 */}
+                        {/* 임상/안전성 테스트 */}
                         {selectedProduct.safety_tests?.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2">🛡️ 안전성 테스트</h4>
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">🛡️ 임상/안전성 테스트</h4>
                             <div className="space-y-2">
                               {selectedProduct.safety_tests.map((t: any, i: number) => (
                                 <div key={i} className="bg-blue-50 p-3 rounded-lg">
@@ -780,10 +797,10 @@ export default function OliveyoungDBPage() {
                         )}
 
                         {/* 제형 정보 */}
-                        {selectedProduct.formula_info && (selectedProduct.formula_info.pH || selectedProduct.formula_info.texture) && (
+                        {selectedProduct.formula_info && (selectedProduct.formula_info.pH || selectedProduct.formula_info.texture || selectedProduct.formula_info.keyFeature) && (
                           <div>
                             <h4 className="text-sm font-semibold text-gray-700 mb-2">🧴 제형 정보</h4>
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 flex-wrap">
                               {selectedProduct.formula_info.pH && (
                                 <span className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium">
                                   pH: {selectedProduct.formula_info.pH}
@@ -794,20 +811,43 @@ export default function OliveyoungDBPage() {
                                   {selectedProduct.formula_info.texture}
                                 </span>
                               )}
+                              {selectedProduct.formula_info.keyFeature && (
+                                <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium">
+                                  {selectedProduct.formula_info.keyFeature}
+                                </span>
+                              )}
                             </div>
                           </div>
                         )}
 
-                        {/* 사용법 */}
-                        {selectedProduct.how_to_use?.steps?.length > 0 && (
+                        {/* 제품 하이라이트 (새 구조: productHighlights) */}
+                        {selectedProduct.how_to_use && typeof selectedProduct.how_to_use === 'object' && !selectedProduct.how_to_use.steps && (
                           <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 사용법</h4>
-                            <div className="space-y-1.5">
-                              {selectedProduct.how_to_use.steps.map((s: any, i: number) => (
-                                <p key={i} className="text-xs text-gray-600 pl-3 border-l-2 border-gray-200">
-                                  <span className="font-medium">Step {s.step}:</span> {s.description}
-                                </p>
-                              ))}
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">🏆 제품 하이라이트</h4>
+                            <div className="space-y-2">
+                              {[
+                                { key: 'salesRecord', label: '📊 판매 실적', color: 'bg-orange-50 text-orange-700' },
+                                { key: 'rankings', label: '🥇 랭킹/어워즈', color: 'bg-yellow-50 text-yellow-700' },
+                                { key: 'certifications', label: '✅ 인증', color: 'bg-green-50 text-green-700' },
+                                { key: 'formulaFeatures', label: '⚗️ 제형 특장점', color: 'bg-violet-50 text-violet-700' },
+                                { key: 'targetAudience', label: '👤 추천 대상', color: 'bg-cyan-50 text-cyan-700' },
+                                { key: 'others', label: '💎 기타', color: 'bg-gray-50 text-gray-600' },
+                              ].map(({ key, label, color }) => {
+                                const items = (selectedProduct.how_to_use as any)?.[key];
+                                if (!items || !Array.isArray(items) || items.length === 0) return null;
+                                return (
+                                  <div key={key}>
+                                    <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {items.map((item: string, j: number) => (
+                                        <span key={j} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${color}`}>
+                                          {item}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
