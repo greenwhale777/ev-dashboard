@@ -819,7 +819,8 @@ export default function EV2Page() {
         {/* 제품 탐색 탭 */}
         {/* ============================================================ */}
         {activeTab === 'products' && (
-          <div className="space-y-4">
+          <div>
+            <div className="sticky top-[130px] z-[5] bg-[#F8FAFC] pb-4">
             <div className="bg-white rounded-2xl border p-4">
               <h3 className="font-bold text-gray-900 mb-3">🔍 제품 검색</h3>
               <div className="flex flex-wrap gap-3">
@@ -857,7 +858,9 @@ export default function EV2Page() {
                 </button>
               </div>
             </div>
+            </div>
 
+            <div className="space-y-4">
             <div className="bg-white rounded-2xl border">
               <div className="p-4 border-b flex items-center justify-between">
                 <span className="text-sm text-gray-500">
@@ -981,6 +984,7 @@ export default function EV2Page() {
                 </div>
               );
             })()}
+            </div>
           </div>
         )}
 
@@ -1198,7 +1202,8 @@ export default function EV2Page() {
         {/* 개별 분석 탭 */}
         {/* ============================================================ */}
         {activeTab === 'analyze' && (
-          <div className="space-y-4">
+          <div>
+            <div className="sticky top-[130px] z-[5] bg-[#F8FAFC] pb-4">
             <div className="bg-white rounded-2xl border p-6">
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-3xl">🔬</span>
@@ -1259,27 +1264,10 @@ export default function EV2Page() {
                 </div>
               )}
 
-              {!analyzing && (
-                <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                  <p className="text-sm font-semibold text-slate-700 mb-2">📌 테스트 URL:</p>
-                  <div className="space-y-1 text-xs">
-                    <button
-                      onClick={() => setUrl('https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000243074')}
-                      className="block hover:text-blue-600 text-slate-600 cursor-pointer"
-                    >
-                      → 라네즈 립슬리핑마스크
-                    </button>
-                    <button
-                      onClick={() => setUrl('https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000162054')}
-                      className="block hover:text-blue-600 text-slate-600 cursor-pointer"
-                    >
-                      → 라운드랩 자작나무 수분토너
-                    </button>
-                  </div>
-                </div>
-              )}
+            </div>
             </div>
 
+            <div className="space-y-4">
             {/* 분석 결과 목록 */}
             <div className="bg-white rounded-2xl border p-6">
               <div className="flex items-center justify-between mb-4">
@@ -1332,6 +1320,7 @@ export default function EV2Page() {
                   ))}
                 </div>
               )}
+            </div>
             </div>
           </div>
         )}
