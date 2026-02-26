@@ -796,7 +796,7 @@ export default function EV2Page() {
                         {cat.lastAnalyzed && <span>🕐 {formatDate(cat.lastAnalyzed)}</span>}
                       </div>
                       <button
-                        onClick={() => startBatch(cat.categoryKey, 24)}
+                        onClick={() => startBatch(cat.categoryKey, 100)}
                         disabled={batchPolling}
                         className="px-3 py-1 bg-[#0F172A] text-white rounded-lg text-xs font-medium hover:bg-[#1e293b] transition disabled:opacity-50"
                       >
