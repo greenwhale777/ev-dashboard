@@ -439,12 +439,10 @@ export default function EV2Page() {
   }, []);
 
   useEffect(() => {
+    if (activeTab === 'db') { fetchCategories(); fetchBatchJobs(); }
     if (activeTab === 'products') fetchProducts();
-  }, [activeTab, productFilter, currentPage]);
-
-  useEffect(() => {
     if (activeTab === 'analyze') fetchAnalyzeResults();
-  }, [activeTab]);
+  }, [activeTab, productFilter, currentPage]);
 
   useEffect(() => {
     if (!batchPolling || !activeBatch) return;
