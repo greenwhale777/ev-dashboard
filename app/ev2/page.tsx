@@ -48,6 +48,10 @@ interface Product {
   total_blocks: number;
   image_count: number;
   analyzed_at: string | null;
+  original_price: string | null;
+  sale_price: string | null;
+  manufacturer: string | null;
+  full_ingredients: string | null;
 }
 
 interface ProductDetail extends Product {
@@ -97,6 +101,8 @@ export default function EV2Page() {
   const [productFilter, setProductFilter] = useState({ category: '', brand: '', search: '' });
   const [productLoading, setProductLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
   const pageSize = 20;
 
   // ── 제품 상세 ──
@@ -489,6 +495,21 @@ export default function EV2Page() {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br/>');
+  };
+
+  const formatPrice = (price: string | null) => {
+    if (!price) return null;
+    const num = parseInt(price);
+    if (isNaN(num)) return null;
+    return num.toLocaleString() + '원';
+  };
+
+  const calcDiscountRate = (original: string | null, sale: string | null) => {
+    if (!original || !sale) return null;
+    const o = parseInt(original);
+    const s = parseInt(sale);
+    if (isNaN(o) || isNaN(s) || o <= s || o === 0) return null;
+    return Math.round((1 - s / o) * 100);
   };
 
   const safeString = (val: any): string => {
@@ -947,50 +968,150 @@ export default function EV2Page() {
                 <div className="p-8 text-center text-gray-400">로딩 중...</div>
               ) : products.length > 0 ? (
                 <div className="divide-y">
-                  {products.map((p, index) => (
-                    <div
-                      key={p.id}
-                      onClick={() => fetchProductDetail(p.id)}
-                      className="p-3 hover:bg-gray-50 cursor-pointer transition flex items-center justify-between"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-mono text-gray-400 w-8">#{(currentPage - 1) * pageSize + index + 1}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-600">{p.small_category} #{p.rank_in_category}위</span>
-                          <span className="text-xs font-medium text-emerald-700">{p.brand_name}</span>
+                  {products.map((p, index) => {
+                    const isExpanded = expandedProductId === p.id;
+                    const discountRate = calcDiscountRate(p.original_price, p.sale_price);
+                    const saleFormatted = formatPrice(p.sale_price);
+                    const originalFormatted = formatPrice(p.original_price);
+
+                    return (
+                      <div key={p.id}>
+                        {/* 제품 행 */}
+                        <div
+                          onClick={() => {
+                            setExpandedProductId(isExpanded ? null : p.id);
+                            setIngredientsExpanded(false);
+                          }}
+                          className={`p-3 hover:bg-gray-50 cursor-pointer transition ${isExpanded ? 'bg-gray-50' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs font-mono text-gray-400 w-8">#{(currentPage - 1) * pageSize + index + 1}</span>
+                                <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-600">{p.small_category} #{p.rank_in_category}위</span>
+                                <span className="text-xs font-medium text-emerald-700">{p.brand_name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 ml-10">
+                                <p className="text-sm text-gray-900 truncate">{p.product_name}</p>
+                                {saleFormatted && (
+                                  <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{saleFormatted}</span>
+                                )}
+                                {discountRate && (
+                                  <span className="text-xs font-bold text-red-500 whitespace-nowrap">{discountRate}%</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                              {p.analysis_status === 'completed' ? (
+                                <span className="text-xs text-emerald-600">✅ {p.total_blocks}블록</span>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); analyzeProduct(p); }}
+                                    disabled={analyzingProductId !== null}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                                      analyzingProductId === p.id
+                                        ? 'bg-blue-100 text-blue-600'
+                                        : analyzingProductId !== null
+                                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                                    }`}
+                                  >
+                                    {analyzingProductId === p.id ? (
+                                      <span className="flex items-center gap-1">
+                                        <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                                        분석 중...
+                                      </span>
+                                    ) : '분석'}
+                                  </button>
+                                  <span className="text-xs text-gray-400">미분석</span>
+                                </div>
+                              )}
+                              <span className={`text-gray-300 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>›</span>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-900 truncate ml-10">{p.product_name}</p>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                        {p.analysis_status === 'completed' ? (
-                          <span className="text-xs text-emerald-600">✅ {p.total_blocks}블록</span>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); analyzeProduct(p); }}
-                              disabled={analyzingProductId !== null}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                                analyzingProductId === p.id
-                                  ? 'bg-blue-100 text-blue-600'
-                                  : analyzingProductId !== null
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
-                              }`}
-                            >
-                              {analyzingProductId === p.id ? (
-                                <span className="flex items-center gap-1">
-                                  <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
-                                  분석 중...
+
+                        {/* 펼침 상세 패널 */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
+                            <div className="pl-10 pt-3 space-y-2">
+                              {/* 가격 정보 */}
+                              <div className="flex items-center gap-3 text-sm">
+                                <span className="text-gray-500 w-14">가격</span>
+                                {saleFormatted ? (
+                                  <div className="flex items-center gap-2">
+                                    {originalFormatted && discountRate ? (
+                                      <span className="text-gray-400 line-through text-xs">{originalFormatted}</span>
+                                    ) : null}
+                                    <span className="font-bold text-gray-900">{saleFormatted}</span>
+                                    {discountRate ? (
+                                      <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{discountRate}% 할인</span>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">가격 정보 없음</span>
+                                )}
+                              </div>
+
+                              {/* 제조사 */}
+                              <div className="flex items-start gap-3 text-sm">
+                                <span className="text-gray-500 w-14">제조사</span>
+                                <span className="text-gray-800">
+                                  {p.manufacturer || <span className="text-gray-400 text-xs">정보 없음</span>}
                                 </span>
-                              ) : '분석'}
-                            </button>
-                            <span className="text-xs text-gray-400">미분석</span>
+                              </div>
+
+                              {/* 전성분 */}
+                              <div className="flex items-start gap-3 text-sm">
+                                <span className="text-gray-500 w-14 flex-shrink-0">전성분</span>
+                                {p.full_ingredients ? (
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-gray-700 text-xs leading-relaxed">
+                                      {ingredientsExpanded
+                                        ? p.full_ingredients
+                                        : p.full_ingredients.length > 100
+                                          ? p.full_ingredients.substring(0, 100) + '...'
+                                          : p.full_ingredients}
+                                    </p>
+                                    {p.full_ingredients.length > 100 && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setIngredientsExpanded(!ingredientsExpanded); }}
+                                        className="text-xs text-blue-500 hover:text-blue-700 mt-1 cursor-pointer"
+                                      >
+                                        {ingredientsExpanded ? '접기' : '더보기'}
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">정보 없음</span>
+                                )}
+                              </div>
+
+                              {/* 상세보기 버튼 */}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); fetchProductDetail(p.id); }}
+                                  className="px-3 py-1.5 text-xs font-medium bg-[#0F172A] text-white rounded-lg hover:bg-[#1E293B] transition cursor-pointer"
+                                >
+                                  상세 분석 보기
+                                </button>
+                                <a
+                                  href={p.product_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border rounded-lg hover:bg-gray-50 transition"
+                                >
+                                  올리브영 페이지 →
+                                </a>
+                              </div>
+                            </div>
                           </div>
                         )}
-                        <span className="text-gray-300">›</span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-8 text-center text-gray-400">검색 결과가 없습니다</div>
