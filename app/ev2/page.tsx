@@ -928,15 +928,15 @@ export default function EV2Page() {
               const totalPages = Math.ceil(productTotal / pageSize);
               const getPageNumbers = () => {
                 const pages: (number | string)[] = [];
-                if (totalPages <= 7) {
+                if (totalPages <= 11) {
                   for (let i = 1; i <= totalPages; i++) pages.push(i);
                 } else {
                   pages.push(1);
-                  if (currentPage > 4) pages.push('...');
-                  const start = Math.max(2, currentPage - 2);
-                  const end = Math.min(totalPages - 1, currentPage + 2);
+                  if (currentPage > 6) pages.push('...');
+                  const start = Math.max(2, currentPage - 4);
+                  const end = Math.min(totalPages - 1, currentPage + 4);
                   for (let i = start; i <= end; i++) pages.push(i);
-                  if (currentPage < totalPages - 3) pages.push('...');
+                  if (currentPage < totalPages - 5) pages.push('...');
                   pages.push(totalPages);
                 }
                 return pages;
