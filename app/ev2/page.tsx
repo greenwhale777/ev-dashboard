@@ -574,6 +574,120 @@ export default function EV2Page() {
             </div>
           </div>
         </div>
+
+        {/* 제품 탐색 탭: 검색 박스 */}
+        {activeTab === 'products' && (
+          <div className="bg-[#F8FAFC] pb-4">
+            <div className="max-w-6xl mx-auto px-4 pt-3">
+              <div className="bg-white rounded-2xl border p-4">
+                <h3 className="font-bold text-gray-900 mb-3">🔍 제품 검색</h3>
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    value={productFilter.category}
+                    onChange={(e) => { setProductFilter(prev => ({ ...prev, category: e.target.value })); setCurrentPage(1); }}
+                    className="px-3 py-2 border rounded-lg text-sm bg-white"
+                  >
+                    <option value="">전체 카테고리</option>
+                    {categories.map(c => (
+                      <option key={c.categoryKey} value={c.categoryKey}>
+                        {c.smallCategory} ({c.analyzedCount})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={productFilter.brand}
+                    onChange={(e) => { setProductFilter(prev => ({ ...prev, brand: e.target.value })); setCurrentPage(1); }}
+                    placeholder="브랜드명..."
+                    className="px-3 py-2 border rounded-lg text-sm w-40"
+                  />
+                  <input
+                    type="text"
+                    value={productFilter.search}
+                    onChange={(e) => { setProductFilter(prev => ({ ...prev, search: e.target.value })); setCurrentPage(1); }}
+                    placeholder="상품명 검색..."
+                    className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[200px]"
+                  />
+                  <button
+                    onClick={fetchProducts}
+                    className="px-4 py-2 bg-[#0F172A] text-white rounded-lg text-sm font-medium hover:bg-[#1e293b] transition"
+                  >
+                    검색
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 개별 분석 탭: 분석 입력 박스 */}
+        {activeTab === 'analyze' && (
+          <div className="bg-[#F8FAFC] pb-4">
+            <div className="max-w-6xl mx-auto px-4 pt-3">
+              <div className="bg-white rounded-2xl border p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-3xl">🔬</span>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">개별 상품 분석</h2>
+                    <p className="text-sm text-gray-500">올리브영 상품 URL을 입력하여 상세페이지를 AI 분석합니다</p>
+                  </div>
+                </div>
+
+                {analyzeError && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <div className="flex items-center gap-2 text-red-600">
+                      <span>❌</span>
+                      <span className="font-medium">{analyzeError}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <input
+                    type="url"
+                    placeholder="https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=..."
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    disabled={analyzing}
+                    className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6] outline-none text-lg disabled:bg-slate-100"
+                    onKeyDown={(e) => e.key === 'Enter' && !analyzing && startAnalysis()}
+                  />
+                  <button
+                    onClick={startAnalysis}
+                    disabled={analyzing || !url}
+                    className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${analyzing || !url
+                      ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                      : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
+                    }`}
+                  >
+                    {analyzing ? '분석 중...' : '🚀 분석 시작'}
+                  </button>
+                </div>
+
+                {analyzing && (
+                  <div className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="animate-spin h-6 w-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
+                      <span className="font-bold text-blue-900 text-lg">{progressMessage}</span>
+                    </div>
+                    <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-full transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <div className="mt-2 text-sm text-blue-700 text-right font-semibold">{progress}%</div>
+                    <div className="mt-4 text-sm text-blue-600">
+                      <p>⏱️ 예상 소요 시간: 1-2분</p>
+                      <p className="mt-1">📌 완료되면 자동으로 결과 페이지로 이동합니다</p>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-4">
@@ -819,48 +933,7 @@ export default function EV2Page() {
         {/* 제품 탐색 탭 */}
         {/* ============================================================ */}
         {activeTab === 'products' && (
-          <div>
-            <div className="sticky top-[130px] z-[5] bg-[#F8FAFC] pb-4">
-            <div className="bg-white rounded-2xl border p-4">
-              <h3 className="font-bold text-gray-900 mb-3">🔍 제품 검색</h3>
-              <div className="flex flex-wrap gap-3">
-                <select
-                  value={productFilter.category}
-                  onChange={(e) => { setProductFilter(prev => ({ ...prev, category: e.target.value })); setCurrentPage(1); }}
-                  className="px-3 py-2 border rounded-lg text-sm bg-white"
-                >
-                  <option value="">전체 카테고리</option>
-                  {categories.map(c => (
-                    <option key={c.categoryKey} value={c.categoryKey}>
-                      {c.smallCategory} ({c.analyzedCount})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={productFilter.brand}
-                  onChange={(e) => { setProductFilter(prev => ({ ...prev, brand: e.target.value })); setCurrentPage(1); }}
-                  placeholder="브랜드명..."
-                  className="px-3 py-2 border rounded-lg text-sm w-40"
-                />
-                <input
-                  type="text"
-                  value={productFilter.search}
-                  onChange={(e) => { setProductFilter(prev => ({ ...prev, search: e.target.value })); setCurrentPage(1); }}
-                  placeholder="상품명 검색..."
-                  className="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[200px]"
-                />
-                <button
-                  onClick={fetchProducts}
-                  className="px-4 py-2 bg-[#0F172A] text-white rounded-lg text-sm font-medium hover:bg-[#1e293b] transition"
-                >
-                  검색
-                </button>
-              </div>
-            </div>
-            </div>
-
-            <div className="space-y-4">
+          <div className="space-y-4">
             <div className="bg-white rounded-2xl border">
               <div className="p-4 border-b flex items-center justify-between">
                 <span className="text-sm text-gray-500">
@@ -876,7 +949,7 @@ export default function EV2Page() {
                 <div className="p-8 text-center text-gray-400">로딩 중...</div>
               ) : products.length > 0 ? (
                 <div className="divide-y">
-                  {products.map((p) => (
+                  {products.map((p, index) => (
                     <div
                       key={p.id}
                       onClick={() => fetchProductDetail(p.id)}
@@ -884,8 +957,8 @@ export default function EV2Page() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-mono text-gray-400 w-8">#{p.rank_in_category}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-600">{p.small_category}</span>
+                          <span className="text-xs font-mono text-gray-400 w-8">#{(currentPage - 1) * pageSize + index + 1}</span>
+                          <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-600">{p.small_category} #{p.rank_in_category}위</span>
                           <span className="text-xs font-medium text-emerald-700">{p.brand_name}</span>
                         </div>
                         <p className="text-sm text-gray-900 truncate ml-10">{p.product_name}</p>
@@ -984,7 +1057,6 @@ export default function EV2Page() {
                 </div>
               );
             })()}
-            </div>
           </div>
         )}
 
@@ -1202,72 +1274,7 @@ export default function EV2Page() {
         {/* 개별 분석 탭 */}
         {/* ============================================================ */}
         {activeTab === 'analyze' && (
-          <div>
-            <div className="sticky top-[130px] z-[5] bg-[#F8FAFC] pb-4">
-            <div className="bg-white rounded-2xl border p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-3xl">🔬</span>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">개별 상품 분석</h2>
-                  <p className="text-sm text-gray-500">올리브영 상품 URL을 입력하여 상세페이지를 AI 분석합니다</p>
-                </div>
-              </div>
-
-              {analyzeError && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-                  <div className="flex items-center gap-2 text-red-600">
-                    <span>❌</span>
-                    <span className="font-medium">{analyzeError}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <input
-                  type="url"
-                  placeholder="https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=..."
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  disabled={analyzing}
-                  className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6] outline-none text-lg disabled:bg-slate-100"
-                  onKeyDown={(e) => e.key === 'Enter' && !analyzing && startAnalysis()}
-                />
-                <button
-                  onClick={startAnalysis}
-                  disabled={analyzing || !url}
-                  className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all ${analyzing || !url
-                    ? 'bg-slate-300 cursor-not-allowed text-slate-500'
-                    : 'bg-[#3B82F6] hover:bg-[#2563EB] text-white active:scale-[0.98] cursor-pointer'
-                  }`}
-                >
-                  {analyzing ? '분석 중...' : '🚀 분석 시작'}
-                </button>
-              </div>
-
-              {analyzing && (
-                <div className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="animate-spin h-6 w-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
-                    <span className="font-bold text-blue-900 text-lg">{progressMessage}</span>
-                  </div>
-                  <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-blue-600 h-full transition-all duration-500"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                  <div className="mt-2 text-sm text-blue-700 text-right font-semibold">{progress}%</div>
-                  <div className="mt-4 text-sm text-blue-600">
-                    <p>⏱️ 예상 소요 시간: 1-2분</p>
-                    <p className="mt-1">📌 완료되면 자동으로 결과 페이지로 이동합니다</p>
-                  </div>
-                </div>
-              )}
-
-            </div>
-            </div>
-
-            <div className="space-y-4">
+          <div className="space-y-4">
             {/* 분석 결과 목록 */}
             <div className="bg-white rounded-2xl border p-6">
               <div className="flex items-center justify-between mb-4">
@@ -1320,7 +1327,6 @@ export default function EV2Page() {
                   ))}
                 </div>
               )}
-            </div>
             </div>
           </div>
         )}
