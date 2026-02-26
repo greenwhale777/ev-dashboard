@@ -259,7 +259,7 @@ export default function EV2Page() {
   // ============================================================
   // Batch Actions
   // ============================================================
-  const startBatch = async (categoryKey: string, maxProducts: number = 24) => {
+  const startBatch = async (categoryKey: string, maxProducts: number = 100) => {
     try {
       const res = await fetch(`${API_URL}/api/oy/batch/start`, {
         method: 'POST',
