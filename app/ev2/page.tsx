@@ -1094,7 +1094,7 @@ export default function EV2Page() {
                                   onClick={(e) => { e.stopPropagation(); fetchProductDetail(p.id); }}
                                   className="px-3 py-1.5 text-xs font-medium bg-[#0F172A] text-white rounded-lg hover:bg-[#1E293B] transition cursor-pointer"
                                 >
-                                  상세 분석 보기
+                                  상세페이지 분석
                                 </button>
                                 <a
                                   href={p.product_url}
