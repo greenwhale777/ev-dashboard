@@ -363,7 +363,7 @@ export default function Dashboard() {
                   <span className="text-xs font-semibold text-emerald-400">자동</span>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[11px] text-slate-500">· 매일 03:00 실행</p>
+                  <p className="text-[11px] text-slate-500">· 매일 12:30 실행</p>
                   <p className="text-[11px] text-slate-500">· Google Drive 저장</p>
                 </div>
               </div>
@@ -481,7 +481,7 @@ export default function Dashboard() {
                   <h3 className="font-bold text-slate-900 mb-3">🗄️ 데이터베이스</h3>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">호스팅</span><span className="text-slate-700 font-medium">Railway PostgreSQL</span></div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">백업 주기</span><span className="text-slate-700 font-medium">매일 03:00</span></div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">백업 주기</span><span className="text-slate-700 font-medium">매일 12:30</span></div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">백업 위치</span><span className="text-slate-700 font-medium">Google Drive</span></div>
                     <div className="flex justify-between py-1.5"><span className="text-slate-400">보관 정책</span><span className="text-slate-700 font-medium">무제한</span></div>
                   </div>
