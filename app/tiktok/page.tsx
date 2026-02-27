@@ -222,7 +222,7 @@ export default function TikTokAnalyzerPage() {
 
   const fetchKeywordHistory = useCallback(async (keywordId: number, keyword: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/tiktok/searches?limit=50`);
+      const res = await fetch(`${API_URL}/api/tiktok/searches?limit=500`);
       const data = await res.json();
       if (data.success) {
         const filtered = (data.data || []).filter((s: TikTokSearch) => s.keyword === keyword);
