@@ -491,6 +491,13 @@ export default function EV2Page() {
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>{s.label}</span>;
   };
 
+  // 인라인 마크다운 서식 변환 (bold + 링크)
+  const formatInline = (text: string) => {
+    return text
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">$1</a>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  };
+
   const renderMarkdown = (text: string) => {
     // 마크다운 테이블을 HTML 테이블로 변환
     const lines = text.split('\n');
@@ -516,26 +523,25 @@ export default function EV2Page() {
           let tableHtml = '<div class="overflow-x-auto my-2"><table class="w-full text-xs border-collapse">';
           tableHtml += '<thead><tr>';
           headers.forEach(h => {
-            tableHtml += `<th class="border border-gray-300 bg-gray-50 px-2 py-1 text-left font-semibold">${h.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</th>`;
+            tableHtml += `<th class="border border-gray-300 bg-gray-50 px-2 py-1 text-left font-semibold">${formatInline(h)}</th>`;
           });
           tableHtml += '</tr></thead><tbody>';
           dataRows.forEach(row => {
             tableHtml += '<tr>';
             row.forEach(cell => {
-              tableHtml += `<td class="border border-gray-300 px-2 py-1">${cell.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</td>`;
+              tableHtml += `<td class="border border-gray-300 px-2 py-1">${formatInline(cell)}</td>`;
             });
             tableHtml += '</tr>';
           });
           tableHtml += '</tbody></table></div>';
           result.push(tableHtml);
         } else {
-          // 테이블이 아닌 경우 그냥 추가
           tableLines.forEach(l => {
-            result.push(l.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'));
+            result.push(formatInline(l));
           });
         }
       } else {
-        result.push(lines[i].replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'));
+        result.push(formatInline(lines[i]));
         i++;
       }
     }
