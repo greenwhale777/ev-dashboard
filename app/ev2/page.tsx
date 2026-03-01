@@ -499,15 +499,23 @@ export default function EV2Page() {
   };
 
   const renderMarkdown = (text: string) => {
-    // 마크다운 테이블을 HTML 테이블로 변환
+    // 마크다운 테이블을 HTML 테이블로 변환 (각 테이블 아래 CSV 다운로드 버튼 포함)
     const lines = text.split('\n');
     const result: string[] = [];
     let i = 0;
 
+    const cleanForCsv = (val: string) => {
+      const clean = val.replace(/\*\*/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+      if (clean.includes(',') || clean.includes('"') || clean.includes('\n')) {
+        return '"' + clean.replace(/"/g, '""') + '"';
+      }
+      return clean;
+    };
+
     while (i < lines.length) {
       // 테이블 감지: | 로 시작하는 연속된 줄
       if (lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-        let tableLines: string[] = [];
+        const tableLines: string[] = [];
         while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
           tableLines.push(lines[i].trim());
           i++;
@@ -534,6 +542,17 @@ export default function EV2Page() {
             tableHtml += '</tr>';
           });
           tableHtml += '</tbody></table></div>';
+
+          // CSV 데이터 생성 → 버튼에 data-csv로 삽입
+          const csvLines: string[] = [];
+          csvLines.push(headers.map(cleanForCsv).join(','));
+          dataRows.forEach(row => csvLines.push(row.map(cleanForCsv).join(',')));
+          const csvEncoded = encodeURIComponent(csvLines.join('\n'));
+
+          tableHtml += `<button data-csv="${csvEncoded}" class="mt-1 mb-2 inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors cursor-pointer">`
+            + `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>`
+            + `CSV 다운로드</button>`;
+
           result.push(tableHtml);
         } else {
           tableLines.forEach(l => {
@@ -549,69 +568,22 @@ export default function EV2Page() {
     return result.join('<br/>');
   };
 
-  // 마크다운 테이블 감지 및 CSV 변환
-  const extractTablesAsCsv = (text: string): string | null => {
-    const lines = text.split('\n');
-    const csvParts: string[] = [];
-    let i = 0;
-
-    while (i < lines.length) {
-      if (lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-        const tableLines: string[] = [];
-        while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-          tableLines.push(lines[i].trim());
-          i++;
-        }
-        if (tableLines.length >= 3) {
-          const parseRow = (line: string) =>
-            line.split('|').slice(1, -1).map(cell => cell.trim().replace(/\*\*/g, ''));
-          const headers = parseRow(tableLines[0]);
-          const dataRows = tableLines.slice(2).map(parseRow);
-
-          const escapeCsv = (val: string) => {
-            if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-              return '"' + val.replace(/"/g, '""') + '"';
-            }
-            return val;
-          };
-
-          csvParts.push(headers.map(escapeCsv).join(','));
-          dataRows.forEach(row => {
-            csvParts.push(row.map(escapeCsv).join(','));
-          });
-        }
-      } else {
-        i++;
-      }
-    }
-
-    return csvParts.length > 0 ? csvParts.join('\n') : null;
-  };
-
-  const handleCsvDownload = (text: string) => {
-    const csv = extractTablesAsCsv(text);
-    if (!csv) return;
+  // CSV 다운로드 핸들러 (data-csv 버튼 클릭 이벤트 위임)
+  const handleCsvButtonClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const btn = (e.target as HTMLElement).closest('[data-csv]');
+    if (!btn) return;
+    e.preventDefault();
+    const csvData = decodeURIComponent(btn.getAttribute('data-csv') || '');
+    if (!csvData) return;
 
     const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    const blob = new Blob([BOM + csvData], { type: 'text/csv;charset=utf-8;' });
+    const dlUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = dlUrl;
     a.download = `oliveyoung_ai_chat_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const hasMarkdownTable = (text: string): boolean => {
-    const lines = text.split('\n');
-    for (let i = 0; i < lines.length - 2; i++) {
-      if (lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|') &&
-          lines[i+1].trim().startsWith('|') && lines[i+1].includes('---') &&
-          lines[i+2].trim().startsWith('|') && lines[i+2].trim().endsWith('|')) {
-        return true;
-      }
-    }
-    return false;
+    URL.revokeObjectURL(dlUrl);
   };
 
   const formatPrice = (price: string | null) => {
@@ -1001,20 +973,10 @@ export default function EV2Page() {
                         msg.role === 'user' ? 'bg-[#0F172A] text-white' : 'bg-gray-100 text-gray-800'
                       }`}>
                         {msg.role === 'user' ? msg.content : (
-                          <>
-                            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
-                            {hasMarkdownTable(msg.content) && (
-                              <button
-                                onClick={() => handleCsvDownload(msg.content)}
-                                className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                CSV 다운로드
-                              </button>
-                            )}
-                          </>
+                          <div
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                            onClick={handleCsvButtonClick}
+                          />
                         )}
                       </div>
                     </div>
