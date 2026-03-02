@@ -14,6 +14,7 @@ interface Schedule {
   day: number | null;
   specific_date: string | null;
   description: string | null;
+  notify_month_before: boolean;
   notify_day_before: boolean;
   notify_on_day: boolean;
   is_active: boolean;
@@ -43,6 +44,7 @@ interface FormData {
   day: number;
   specific_date: string;
   description: string;
+  notify_month_before: boolean;
   notify_day_before: boolean;
   notify_on_day: boolean;
 }
@@ -64,6 +66,7 @@ const DEFAULT_FORM: FormData = {
   day: 1,
   specific_date: '',
   description: '',
+  notify_month_before: false,
   notify_day_before: true,
   notify_on_day: true,
 };
@@ -151,6 +154,7 @@ export default function ManagementCalendarPage() {
         category: formData.category,
         repeat_type: formData.repeat_type,
         description: formData.description || null,
+        notify_month_before: formData.notify_month_before,
         notify_day_before: formData.notify_day_before,
         notify_on_day: formData.notify_on_day,
       };
@@ -240,6 +244,7 @@ export default function ManagementCalendarPage() {
       day: schedule.day || 1,
       specific_date: schedule.specific_date ? schedule.specific_date.slice(0, 10) : '',
       description: schedule.description || '',
+      notify_month_before: schedule.notify_month_before,
       notify_day_before: schedule.notify_day_before,
       notify_on_day: schedule.notify_on_day,
     });
@@ -260,7 +265,7 @@ export default function ManagementCalendarPage() {
       const res = await fetch(`${API_URL}/api/management-calendar/test-notify`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        showToast(`테스트 알림 발송 완료 (D-1: ${data.dayBefore}건, 당일: ${data.onDay}건)`);
+        showToast(`테스트 알림 발송 완료 (D-30: ${data.monthBefore || 0}건, D-1: ${data.dayBefore}건, 당일: ${data.onDay}건)`);
         fetchData();
       } else {
         showToast(data.error || '테스트 실패', 'error');
@@ -411,6 +416,7 @@ export default function ManagementCalendarPage() {
                       <th className="text-left px-3 py-3 font-medium">제목</th>
                       <th className="text-left px-3 py-3 font-medium">반복</th>
                       <th className="text-left px-3 py-3 font-medium">일정일</th>
+                      <th className="text-center px-3 py-3 font-medium">D-30</th>
                       <th className="text-center px-3 py-3 font-medium">D-1</th>
                       <th className="text-center px-3 py-3 font-medium">당일</th>
                       <th className="text-center px-3 py-3 font-medium">상태</th>
@@ -435,6 +441,7 @@ export default function ManagementCalendarPage() {
                             {s.repeat_type === 'monthly' ? '매월' : s.repeat_type === 'yearly' ? '매년' : '1회'}
                           </td>
                           <td className="px-3 py-3 text-slate-600 text-xs font-medium">{formatScheduleDate(s)}</td>
+                          <td className="px-3 py-3 text-center">{s.notify_month_before ? '✓' : '✗'}</td>
                           <td className="px-3 py-3 text-center">{s.notify_day_before ? '✓' : '✗'}</td>
                           <td className="px-3 py-3 text-center">{s.notify_on_day ? '✓' : '✗'}</td>
                           <td className="px-3 py-3 text-center">
@@ -476,9 +483,10 @@ export default function ManagementCalendarPage() {
                     <div key={log.id} className="flex items-center gap-2.5 text-xs py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                       <span className="text-slate-400 w-20 flex-shrink-0">{formatTime(log.sent_at)}</span>
                       <span className={`font-semibold px-1.5 py-0.5 rounded ${
+                        log.notification_type === 'month_before' ? 'bg-purple-50 text-purple-600' :
                         log.notification_type === 'day_before' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
                       }`}>
-                        {log.notification_type === 'day_before' ? 'D-1' : '당일'}
+                        {log.notification_type === 'month_before' ? 'D-30' : log.notification_type === 'day_before' ? 'D-1' : '당일'}
                       </span>
                       <span className="font-medium text-slate-700 flex-shrink-0">{cat.icon} {log.title}</span>
                       <span className={`font-semibold px-1.5 py-0.5 rounded ${
@@ -519,7 +527,10 @@ export default function ManagementCalendarPage() {
                   <div>
                     <label className="text-xs font-medium text-slate-500 mb-1 block">카테고리</label>
                     <select value={formData.category}
-                      onChange={e => setFormData({ ...formData, category: e.target.value })}
+                      onChange={e => {
+                        const newCat = e.target.value;
+                        setFormData({ ...formData, category: newCat, notify_month_before: newCat === 'tax' ? true : formData.notify_month_before });
+                      }}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500">
                       {Object.entries(CATEGORIES).map(([k, v]) => (
                         <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -596,7 +607,13 @@ export default function ManagementCalendarPage() {
                   </div>
 
                   {/* 알림 설정 */}
-                  <div className="flex gap-6">
+                  <div className="flex gap-5 flex-wrap">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={formData.notify_month_before}
+                        onChange={e => setFormData({ ...formData, notify_month_before: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                      <span className="text-sm text-slate-600">D-30 알림</span>
+                    </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={formData.notify_day_before}
                         onChange={e => setFormData({ ...formData, notify_day_before: e.target.checked })}
