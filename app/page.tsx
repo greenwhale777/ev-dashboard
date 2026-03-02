@@ -49,14 +49,16 @@ const botConfigs = {
     color: '#8B5CF6',
     bots: [
       { id: 'accounting', name: '회계전표 업로드', schedule: '매주 수요일 12:00', hasManualRun: true, link: '/ev3/accounting' },
-      { id: 'cash-bot', name: '캐시 잔액 확인', schedule: '매일 08:00', hasManualRun: true }
+      { id: 'cash-bot', name: '캐시 잔액 확인', schedule: '매일 08:00', hasManualRun: true },
+      { id: 'management-calendar', name: '관리 일정 알림', schedule: '매일 09:00 체크', hasManualRun: false, link: '/ev3/management-calendar' }
     ],
     description: '회계 및 재무 자동화',
-    botIds: ['accounting', 'cash-bot'],
+    botIds: ['accounting', 'cash-bot', 'management-calendar'],
   }
 };
 
 const changelog = [
+  { date: '3/02', text: 'EV3 관리 일정 알림봇 추가 (세금/급여/보험/계약 일정 텔레그램 알림)' },
   { date: '2/22', text: '새 PC 마이그레이션 (24시간 가동 환경 구축)' },
   { date: '2/21', text: 'TikTok 대시보드 UI 개편 (탭 재구성, 자동 갱신, AI 채팅 강화)' },
   { date: '2/21', text: '스크롤 패턴 최적화 + 봇 감지 회피 개선' },
@@ -427,6 +429,7 @@ export default function Dashboard() {
                       <option value="tiktok-analyzer">TikTok</option>
                       <option value="accounting">회계전표</option>
                       <option value="cash-bot">캐시잔액</option>
+                      <option value="management-calendar">관리일정</option>
                     </select>
                   </div>
                 </div>
