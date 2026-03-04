@@ -36,7 +36,7 @@ const botConfigs = {
     icon: '🔍',
     color: '#3B82F6',
     bots: [
-      { id: 'oliveyoung', name: '올리브영 스크래퍼', schedule: '매주 월요일 09:00 · 18개 카테고리 × 100개', hasManualRun: true },
+      { id: 'oliveyoung', name: '올리브영 스크래퍼', schedule: '매주 월요일 09:00', hasManualRun: true },
       { id: 'page-analyzer', name: '올리브영 분석', schedule: '수동 실행', hasManualRun: true, link: '/ev2' },
       { id: 'tiktok-analyzer', name: 'TikTok 광고 분석', schedule: '매일 10:00', hasManualRun: false, link: '/tiktok' }
     ],
@@ -58,7 +58,6 @@ const botConfigs = {
 };
 
 const changelog = [
-  { date: '3/05', text: '올리브영 스크래퍼 v2: 25→18개 카테고리, 카테고리별 24→100개 수집 (최대 1,800개)' },
   { date: '3/02', text: 'EV3 관리 일정 알림봇 추가 (세금/급여/보험/계약 일정 텔레그램 알림)' },
   { date: '2/22', text: '새 PC 마이그레이션 (24시간 가동 환경 구축)' },
   { date: '2/21', text: 'TikTok 대시보드 UI 개편 (탭 재구성, 자동 갱신, AI 채팅 강화)' },
@@ -255,37 +254,6 @@ export default function Dashboard() {
                       <a href={bot.link} className="px-3.5 py-2 text-white text-xs font-semibold rounded-lg transition-all active:scale-95" style={{ backgroundColor: config.color }}>열기 →</a>
                     )}
                   </div>
-                  {bot.id === 'oliveyoung' && (
-                    <div className="mt-3 p-3 bg-white rounded-lg border border-slate-100">
-                      <p className="text-[11px] font-semibold text-slate-700 mb-2">📊 수집 현황: 18개 카테고리 × 최대 100개 = 최대 1,800개</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="p-2 bg-blue-50 rounded-lg">
-                          <p className="text-[10px] font-bold text-blue-600 mb-1">🧴 스킨케어 (6)</p>
-                          <div className="space-y-0.5">
-                            {['스킨/토너','에센스/세럼/앰플','크림','로션','미스트/픽서','스킨케어세트'].map(c => (
-                              <p key={c} className="text-[9px] text-slate-500">· {c}</p>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="p-2 bg-green-50 rounded-lg">
-                          <p className="text-[10px] font-bold text-green-600 mb-1">🧼 클렌징 (6)</p>
-                          <div className="space-y-0.5">
-                            {['클렌징오일','클렌징밤','클렌징워터','클렌징밀크','클렌징폼/젤','팩클렌저'].map(c => (
-                              <p key={c} className="text-[9px] text-slate-500">· {c}</p>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="p-2 bg-amber-50 rounded-lg">
-                          <p className="text-[10px] font-bold text-amber-600 mb-1">☀️ 선케어 (6)</p>
-                          <div className="space-y-0.5">
-                            {['선크림','선스틱','선쿠션','선파우더','선스프레이','선패치'].map(c => (
-                              <p key={c} className="text-[9px] text-slate-500">· {c}</p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   {status?.message && bot.id !== 'tiktok-analyzer' && (
                     <div className="mt-2 p-2 bg-white rounded-lg">
                       <p className="text-[11px] text-slate-500 truncate">{status.message}</p>
