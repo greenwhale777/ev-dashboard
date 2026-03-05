@@ -72,6 +72,7 @@ interface ProductDetail extends Product {
 interface AiMessage {
   role: 'user' | 'assistant';
   content: string;
+  user_name?: string;
 }
 
 interface AiChatHistory {
@@ -117,7 +118,16 @@ export default function EV2Page() {
   const [aiChatId, setAiChatId] = useState<number | null>(null);
   const [aiChatHistory, setAiChatHistory] = useState<AiChatHistory[]>([]);
   const [showAiHistory, setShowAiHistory] = useState(false);
+  const [aiUserName, setAiUserName] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const USER_NAME_OPTIONS = ['전상우', '채우리', '임서화', '박정우'];
+  const USER_NAME_COLORS: Record<string, string> = {
+    '전상우': 'text-blue-600',
+    '채우리': 'text-pink-600',
+    '임서화': 'text-purple-600',
+    '박정우': 'text-amber-600',
+  };
 
   // ── 제품 탐색 내 개별 분석 ──
   const [analyzingProductId, setAnalyzingProductId] = useState<number | null>(null);
@@ -283,9 +293,9 @@ export default function EV2Page() {
   // ============================================================
   const handleAiChat = async (question?: string) => {
     const q = question || aiQuestion;
-    if (!q.trim()) return;
+    if (!q.trim() || !aiUserName) return;
 
-    setAiMessages(prev => [...prev, { role: 'user', content: q }]);
+    setAiMessages(prev => [...prev, { role: 'user', content: q, user_name: aiUserName }]);
     setAiQuestion('');
     setAiLoading(true);
 
@@ -293,7 +303,7 @@ export default function EV2Page() {
       const res = await fetch(`${API_URL}/api/oy/ai-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, chatId: aiChatId })
+        body: JSON.stringify({ question: q, chatId: aiChatId, userName: aiUserName })
       });
       const data = await res.json();
       if (data.success) {
@@ -327,7 +337,7 @@ export default function EV2Page() {
       const res = await fetch(`${API_URL}/api/oy/ai-chats/${chatId}`);
       const data = await res.json();
       if (data.success) {
-        setAiMessages(data.data.map((m: any) => ({ role: m.role, content: m.content })));
+        setAiMessages(data.data.map((m: any) => ({ role: m.role, content: m.content, user_name: m.user_name })));
         setAiChatId(chatId);
         setShowAiHistory(false);
       }
@@ -969,15 +979,20 @@ export default function EV2Page() {
                 <div className="space-y-3 mb-4 max-h-[500px] overflow-y-auto">
                   {aiMessages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-3 rounded-xl text-sm whitespace-pre-wrap ${
-                        msg.role === 'user' ? 'bg-[#0F172A] text-white' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {msg.role === 'user' ? msg.content : (
-                          <div
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                            onClick={handleCsvButtonClick}
-                          />
+                      <div className={`max-w-[85%] ${msg.role === 'user' ? '' : ''}`}>
+                        {msg.role === 'user' && msg.user_name && (
+                          <p className={`text-xs font-semibold mb-1 text-right ${USER_NAME_COLORS[msg.user_name] || 'text-gray-500'}`}>{msg.user_name}</p>
                         )}
+                        <div className={`p-3 rounded-xl text-sm whitespace-pre-wrap ${
+                          msg.role === 'user' ? 'bg-[#0F172A] text-white' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {msg.role === 'user' ? msg.content : (
+                            <div
+                              dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                              onClick={handleCsvButtonClick}
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1003,7 +1018,7 @@ export default function EV2Page() {
                   ].map(q => (
                     <button
                       key={q}
-                      onClick={() => { setAiQuestion(q); handleAiChat(q); }}
+                      onClick={() => { if (!aiUserName) { alert('이름을 먼저 선택해주세요'); return; } setAiQuestion(q); handleAiChat(q); }}
                       className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border rounded-lg text-xs text-gray-700 transition"
                     >
                       {q}
@@ -1015,19 +1030,31 @@ export default function EV2Page() {
               <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 mt-4">
                 <p className="text-xs font-semibold text-emerald-600 mb-2">💬 AI에게 질문하기</p>
                 <div className="flex gap-2">
+                  <select
+                    value={aiUserName}
+                    onChange={(e) => setAiUserName(e.target.value)}
+                    className="px-3 py-3 border-2 border-emerald-300 bg-white rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                    disabled={aiLoading}
+                  >
+                    <option value="">이름 선택</option>
+                    {USER_NAME_OPTIONS.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     value={aiQuestion}
                     onChange={(e) => setAiQuestion(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim() && aiUserName) handleAiChat(); }}
                     placeholder="무엇이든 질문하세요... (예: 클렌징밀크 카테고리에서 가장 많이 사용되는 성분은?)"
                     className="flex-1 px-4 py-3 border-2 border-emerald-300 bg-white rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
                     disabled={aiLoading}
                   />
                   <button
-                    onClick={() => aiQuestion.trim() && handleAiChat()}
-                    disabled={aiLoading || !aiQuestion.trim()}
+                    onClick={() => aiQuestion.trim() && aiUserName && handleAiChat()}
+                    disabled={aiLoading || !aiQuestion.trim() || !aiUserName}
                     className="px-5 py-3 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50"
+                    title={!aiUserName ? '이름을 선택해주세요' : ''}
                   >
                     {aiLoading ? '분석 중...' : '🚀 전송'}
                   </button>
