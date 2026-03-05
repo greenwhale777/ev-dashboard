@@ -79,6 +79,7 @@ interface AiChatHistory {
   id: number;
   title: string;
   updated_at: string;
+  user_name?: string;
 }
 
 // ============================================================
@@ -119,6 +120,7 @@ export default function EV2Page() {
   const [aiChatHistory, setAiChatHistory] = useState<AiChatHistory[]>([]);
   const [showAiHistory, setShowAiHistory] = useState(false);
   const [aiUserName, setAiUserName] = useState('');
+  const [aiHistoryFilter, setAiHistoryFilter] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const USER_NAME_OPTIONS = ['전상우', '채우리', '임서화', '박정우'];
@@ -956,12 +958,32 @@ export default function EV2Page() {
             {showAiHistory && (
               <div className="bg-white rounded-2xl border p-4">
                 <h4 className="font-bold text-gray-800 mb-3">📋 대화 이력</h4>
-                {aiChatHistory.length > 0 ? (
+                <div className="flex gap-1.5 mb-3 flex-wrap">
+                  {['', ...USER_NAME_OPTIONS].map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => setAiHistoryFilter(name)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                        aiHistoryFilter === name
+                          ? 'bg-[#0F172A] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {name || '전체'}
+                    </button>
+                  ))}
+                </div>
+                {aiChatHistory.filter(c => !aiHistoryFilter || c.user_name === aiHistoryFilter).length > 0 ? (
                   <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                    {aiChatHistory.map((chat) => (
+                    {aiChatHistory.filter(c => !aiHistoryFilter || c.user_name === aiHistoryFilter).map((chat) => (
                       <div key={chat.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                         <button onClick={() => loadAiChat(chat.id)} className="flex-1 text-left">
-                          <p className="text-sm font-medium text-gray-800 truncate">{chat.title}</p>
+                          <div className="flex items-center gap-2">
+                            {chat.user_name && (
+                              <span className={`text-xs font-semibold ${USER_NAME_COLORS[chat.user_name] || 'text-gray-500'}`}>{chat.user_name}</span>
+                            )}
+                            <p className="text-sm font-medium text-gray-800 truncate flex-1">{chat.title}</p>
+                          </div>
                           <p className="text-xs text-gray-400">{formatDate(chat.updated_at)}</p>
                         </button>
                         <button onClick={() => deleteAiChat(chat.id)} className="ml-2 px-2 py-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition">🗑</button>
