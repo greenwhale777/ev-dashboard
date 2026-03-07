@@ -93,7 +93,7 @@ export default function OliveyoungRankingPage() {
   const [rankingChanges, setRankingChanges] = useState<RankingChange[]>([]);
   const [batches, setBatches] = useState<OYBatch[]>([]);
   const [stats, setStats] = useState<OYStats | null>(null);
-  const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 50, totalPages: 0 });
+  const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 100, totalPages: 0 });
 
   // Filters
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -136,7 +136,7 @@ export default function OliveyoungRankingPage() {
       if (selectedSmallCategory) params.set('smallCategory', selectedSmallCategory);
       if (searchQuery) params.set('search', searchQuery);
       params.set('page', pagination.page.toString());
-      params.set('limit', '50');
+      params.set('limit', '100');
 
       const res = await fetch(`${API_URL}/api/oy/products?${params}`);
       const data = await res.json();
