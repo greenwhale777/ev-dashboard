@@ -37,7 +37,7 @@ const botConfigs = {
     icon: '🔍',
     color: '#3B82F6',
     bots: [
-      { id: 'oliveyoung', name: '올리브영 스크래퍼', schedule: '매주 월요일 09:00 · 18개 카테고리 × 100개', hasManualRun: true, link: '/oliveyoung-ranking' },
+      { id: 'oliveyoung', name: '올리브영 스크래퍼', schedule: '매주 월요일 09:00 · 18개 카테고리 × 100개', hasManualRun: true },
       { id: 'page-analyzer', name: '올리브영 분석', schedule: '수동 실행', hasManualRun: true, link: '/ev2' },
       { id: 'tiktok-analyzer', name: 'TikTok 광고 분석', schedule: '매일 10:00', hasManualRun: false, link: '/tiktok' }
     ],
