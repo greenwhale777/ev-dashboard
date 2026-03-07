@@ -12,6 +12,7 @@ ASCENDERZ의 EV System(자동화 봇 시스템) 통합 대시보드 프론트엔
 ```
 [Vercel - 이 프로젝트]  →  [Railway - EV0 백엔드]  →  [Railway - PostgreSQL]
                         →  [Railway - TikTok 백엔드]  →  (같은 DB 공유)
+                        →  [Railway - OY Ranking API]  →  (같은 DB 공유, oy_ranking_ 테이블)
 ```
 
 ## 주요 파일
@@ -21,6 +22,7 @@ ASCENDERZ의 EV System(자동화 봇 시스템) 통합 대시보드 프론트엔
 | app/changelog.json | 최근 변경 이력 데이터 (대시보드에 자동 표시) |
 | app/tiktok/page.tsx | TikTok 광고 분석 봇 대시보드 |
 | app/ev2/page.tsx | 상세페이지 분석 봇 |
+| app/oliveyoung-ranking/page.tsx | 올리브영 랭킹 대시보드 |
 | app/ev3/accounting/page.tsx | 회계전표 봇 |
 
 ## 환경변수 (Vercel에 설정됨)
@@ -28,6 +30,7 @@ ASCENDERZ의 EV System(자동화 봇 시스템) 통합 대시보드 프론트엔
 |------|-----|
 | NEXT_PUBLIC_EV0_API_URL | https://ev0-agent-production.up.railway.app |
 | NEXT_PUBLIC_TIKTOK_API_URL | https://ev2-tiktok-analyzer-production.up.railway.app |
+| NEXT_PUBLIC_OY_RANKING_API_URL | https://web-production-0d1c8.up.railway.app |
 
 ## 브랜드 스타일
 - 컬러: 흰색, 검정, 실버, #1E9EDE (파란색)
