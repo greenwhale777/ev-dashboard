@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import changelog from './changelog.json';
 
 const API_URL = process.env.NEXT_PUBLIC_EV0_API_URL || 'https://ev0-agent-production.up.railway.app';
 const TIKTOK_API_URL = process.env.NEXT_PUBLIC_TIKTOK_API_URL || 'https://ev2-tiktok-analyzer-production.up.railway.app';
@@ -57,25 +58,6 @@ const botConfigs = {
   }
 };
 
-const changelog = [
-  { date: '3/05', text: '올리브영 스크래퍼 v2: 25→18개 카테고리, 카테고리별 24→100개 수집 (최대 1,800개)' },
-  { date: '3/02', text: 'EV3 관리 일정 알림봇 추가 (세금/급여/보험/계약 일정 텔레그램 알림)' },
-  { date: '2/22', text: '새 PC 마이그레이션 (24시간 가동 환경 구축)' },
-  { date: '2/21', text: 'TikTok 대시보드 UI 개편 (탭 재구성, 자동 갱신, AI 채팅 강화)' },
-  { date: '2/21', text: '스크롤 패턴 최적화 + 봇 감지 회피 개선' },
-  { date: '2/21', text: 'EV0 로그 확대 (TikTok 100개, 모듈 50개, 통합 100개)' },
-  { date: '2/21', text: 'AI 채팅 영상 추천 시 URL 필수 포함' },
-  { date: '2/19', text: 'EV0 대시보드 개편 + TikTok 로그 연동' },
-  { date: '2/18', text: 'AI 채팅 이력 아카이빙 추가' },
-  { date: '2/18', text: 'DB 백업 자동화 (Google Drive)' },
-  { date: '2/18', text: 'AI 분석 프롬프트 hallucination 방지' },
-  { date: '2/17', text: 'Daily Report 타임존 수정' },
-  { date: '2/17', text: '분석 탭 + AI 채팅 기능 추가' },
-  { date: '2/16', text: 'Daily Report + SadCaptcha 최적화' },
-  { date: '2/14', text: 'SadCaptcha 캡차 자동 해결 연동' },
-  { date: '2/12', text: '일반 Chrome 전환 · 캡차 완전 우회' },
-  { date: '2/10', text: 'TikTok 봇 Task Queue 시스템 구축' },
-];
 
 function getStatusBadge(status: string | undefined) {
   if (status === 'SUCCESS') return { label: '정상', bg: 'bg-emerald-50', text: 'text-emerald-600' };
@@ -397,7 +379,7 @@ export default function Dashboard() {
                   <span className="text-xs font-semibold text-emerald-400">자동</span>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[11px] text-slate-500">· 매일 03:00 실행</p>
+                  <p className="text-[11px] text-slate-500">· 매일 03:00, 13:00 실행</p>
                   <p className="text-[11px] text-slate-500">· Google Drive 저장</p>
                 </div>
               </div>
@@ -516,7 +498,7 @@ export default function Dashboard() {
                   <h3 className="font-bold text-slate-900 mb-3">🗄️ 데이터베이스</h3>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">호스팅</span><span className="text-slate-700 font-medium">Railway PostgreSQL</span></div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">백업 주기</span><span className="text-slate-700 font-medium">매일 03:00</span></div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">백업 주기</span><span className="text-slate-700 font-medium">매일 03:00, 13:00</span></div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100"><span className="text-slate-400">백업 위치</span><span className="text-slate-700 font-medium">Google Drive</span></div>
                     <div className="flex justify-between py-1.5"><span className="text-slate-400">보관 정책</span><span className="text-slate-700 font-medium">무제한</span></div>
                   </div>
