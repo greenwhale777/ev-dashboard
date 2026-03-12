@@ -468,7 +468,7 @@ export default function OliveyoungRankingPage() {
                           {/* 가격 */}
                           <div className="text-right">
                             {p.original_price && <span className="text-xs text-slate-400 line-through block">{p.original_price}</span>}
-                            <span className="text-sm font-semibold text-red-600">{p.price}</span>
+                            <span className={`text-sm font-semibold ${p.original_price ? 'text-red-600' : 'text-slate-800'}`}>{p.price}</span>
                           </div>
 
                           {/* 상세 토글 */}
@@ -594,7 +594,7 @@ export default function OliveyoungRankingPage() {
                             </div>
                             <div className="text-right">
                               {r.original_price && <span className="text-xs text-slate-400 line-through block">{r.original_price}</span>}
-                              <span className="text-xs font-semibold text-red-600">{r.price}</span>
+                              <span className={`text-xs font-semibold ${r.original_price ? 'text-red-600' : 'text-slate-800'}`}>{r.price}</span>
                             </div>
                           </div>
                         );
