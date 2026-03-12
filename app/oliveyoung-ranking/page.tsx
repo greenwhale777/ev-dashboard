@@ -435,7 +435,7 @@ export default function OliveyoungRankingPage() {
                     <span>순위</span>
                     <span>카테고리</span>
                     <span>브랜드 / 상품명</span>
-                    <span className="text-right">가격</span>
+                    <span className="text-right">정가/할인가</span>
                     <span className="text-center">상세</span>
                   </div>
 
@@ -564,7 +564,7 @@ export default function OliveyoungRankingPage() {
                     <span>순위</span>
                     <span>카테고리</span>
                     <span>브랜드 / 상품명</span>
-                    <span className="text-right">가격</span>
+                    <span className="text-right">정가/할인가</span>
                   </div>
 
                   {/* 변동 행 (NEW, UP 먼저 표시) */}
