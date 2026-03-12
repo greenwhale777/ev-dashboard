@@ -17,6 +17,7 @@ interface OYProduct {
   brand: string;
   product_name: string;
   price: string;
+  original_price: string | null;
   product_url: string;
   manufacturer: string | null;
   ingredients: string | null;
@@ -40,6 +41,7 @@ interface RankingChange {
   brand: string;
   product_name: string;
   price: string;
+  original_price: string | null;
   product_url: string;
   previous_rank: number | null;
   change_type: 'NEW' | 'UP' | 'DOWN' | 'SAME';
@@ -464,7 +466,10 @@ export default function OliveyoungRankingPage() {
                           </div>
 
                           {/* 가격 */}
-                          <span className="text-sm font-semibold text-slate-800 text-right">{p.price}</span>
+                          <div className="text-right">
+                            {p.original_price && <span className="text-xs text-slate-400 line-through block">{p.original_price}</span>}
+                            <span className="text-sm font-semibold text-red-600">{p.price}</span>
+                          </div>
 
                           {/* 상세 토글 */}
                           <button
@@ -587,7 +592,10 @@ export default function OliveyoungRankingPage() {
                               <span className="text-xs font-bold text-slate-700">{r.brand}</span>
                               <span className="text-xs text-slate-400 ml-1.5 truncate">{r.product_name}</span>
                             </div>
-                            <span className="text-xs font-medium text-slate-600 text-right">{r.price}</span>
+                            <div className="text-right">
+                              {r.original_price && <span className="text-xs text-slate-400 line-through block">{r.original_price}</span>}
+                              <span className="text-xs font-semibold text-red-600">{r.price}</span>
+                            </div>
                           </div>
                         );
                       })}
