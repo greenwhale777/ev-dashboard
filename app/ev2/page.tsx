@@ -103,7 +103,7 @@ export default function EV2Page() {
   const [productFilter, setProductFilter] = useState({ category: '', brand: '', search: '' });
   const [productLoading, setProductLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(new Set());
   const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
   const pageSize = 20;
 
@@ -1110,7 +1110,7 @@ export default function EV2Page() {
               ) : products.length > 0 ? (
                 <div className="divide-y">
                   {products.map((p, index) => {
-                    const isExpanded = expandedProductId === p.id;
+                    const isExpanded = expandedProductIds.has(p.id);
                     const discountRate = calcDiscountRate(p.original_price, p.sale_price);
                     const saleFormatted = formatPrice(p.sale_price);
                     const originalFormatted = formatPrice(p.original_price);
@@ -1120,8 +1120,12 @@ export default function EV2Page() {
                         {/* 제품 행 */}
                         <div
                           onClick={() => {
-                            setExpandedProductId(isExpanded ? null : p.id);
-                            setIngredientsExpanded(false);
+                            setExpandedProductIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(p.id)) next.delete(p.id);
+                              else next.add(p.id);
+                              return next;
+                            });
                           }}
                           className={`p-3 hover:bg-gray-50 cursor-pointer transition ${isExpanded ? 'bg-gray-50' : ''}`}
                         >
