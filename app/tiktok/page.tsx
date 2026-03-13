@@ -177,12 +177,23 @@ export default function TikTokAnalyzerPage() {
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
-  const [aiMessages, setAiMessages] = useState<{role: string; content: string}[]>([]);
+  const [aiMessages, setAiMessages] = useState<{role: string; content: string; user_name?: string}[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [analyticsDates, setAnalyticsDates] = useState<any[]>([]);
   const [aiChatId, setAiChatId] = useState<number | null>(null);
   const [aiChatHistory, setAiChatHistory] = useState<any[]>([]);
   const [showAiHistory, setShowAiHistory] = useState(false);
+  const [aiUserName, setAiUserName] = useState('');
+  const [aiHistoryFilter, setAiHistoryFilter] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const USER_NAME_OPTIONS = ['채우리', '임서화', '전상우', '박정우'];
+  const USER_NAME_COLORS: Record<string, string> = {
+    '채우리': 'text-pink-600',
+    '임서화': 'text-purple-600',
+    '전상우': 'text-blue-600',
+    '박정우': 'text-amber-600',
+  };
 
   // ============================================================
   // Data Fetching
@@ -454,15 +465,17 @@ export default function TikTokAnalyzerPage() {
   // ============================================================
   // AI Chat
   // ============================================================
-  const handleAiChat = async (question: string) => {
-    setAiMessages(prev => [...prev, { role: 'user', content: question }]);
+  const handleAiChat = async (question?: string) => {
+    const q = question || aiQuestion;
+    if (!q.trim() || !aiUserName) return;
+    setAiMessages(prev => [...prev, { role: 'user', content: q, user_name: aiUserName }]);
     setAiQuestion('');
     setAiLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/tiktok/ai-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, chatId: aiChatId }),
+        body: JSON.stringify({ question: q, chatId: aiChatId, userName: aiUserName }),
       });
       const data = await res.json();
       if (data.success) {
@@ -492,7 +505,7 @@ export default function TikTokAnalyzerPage() {
       const data = await res.json();
       if (data.success) {
         setAiChatId(id);
-        setAiMessages(data.data.messages.map((m: any) => ({ role: m.role, content: m.content })));
+        setAiMessages(data.data.messages.map((m: any) => ({ role: m.role, content: m.content, user_name: m.user_name })));
         setShowAiHistory(false);
       }
     } catch {}
@@ -1515,15 +1528,35 @@ export default function TikTokAnalyzerPage() {
             {showAiHistory && (
               <div className="bg-white rounded-2xl border p-4">
                 <h4 className="font-bold text-gray-800 mb-3">📋 대화 이력</h4>
-                {aiChatHistory.length > 0 ? (
+                <div className="flex gap-1.5 mb-3 flex-wrap">
+                  {['', ...USER_NAME_OPTIONS].map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => setAiHistoryFilter(name)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                        aiHistoryFilter === name
+                          ? 'bg-[#0F172A] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {name || '전체'}
+                    </button>
+                  ))}
+                </div>
+                {aiChatHistory.filter(c => !aiHistoryFilter || c.user_name === aiHistoryFilter).length > 0 ? (
                   <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                    {aiChatHistory.map((chat) => (
+                    {aiChatHistory.filter(c => !aiHistoryFilter || c.user_name === aiHistoryFilter).map((chat) => (
                       <div key={chat.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                         <button
                           onClick={() => loadAiChat(chat.id)}
                           className="flex-1 text-left"
                         >
-                          <p className="text-sm font-medium text-gray-800 truncate">{chat.title}</p>
+                          <div className="flex items-center gap-2">
+                            {chat.user_name && (
+                              <span className={`text-xs font-semibold ${USER_NAME_COLORS[chat.user_name] || 'text-gray-500'}`}>{chat.user_name}</span>
+                            )}
+                            <p className="text-sm font-medium text-gray-800 truncate flex-1">{chat.title}</p>
+                          </div>
                           <p className="text-xs text-gray-400">{new Date(chat.updated_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {chat.message_count}개 메시지</p>
                         </button>
                         <button
@@ -1548,12 +1581,17 @@ export default function TikTokAnalyzerPage() {
                 <div className="space-y-3 mb-4 max-h-[500px] overflow-y-auto">
                   {aiMessages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-3 rounded-xl text-sm whitespace-pre-wrap ${
-                        msg.role === 'user' 
-                          ? 'bg-[#0F172A] text-white' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {msg.role === 'user' ? msg.content : renderAiMessage(msg.content)}
+                      <div className="max-w-[85%]">
+                        {msg.role === 'user' && msg.user_name && (
+                          <p className={`text-xs font-semibold mb-1 text-right ${USER_NAME_COLORS[msg.user_name] || 'text-gray-500'}`}>{msg.user_name}</p>
+                        )}
+                        <div className={`p-3 rounded-xl text-sm whitespace-pre-wrap ${
+                          msg.role === 'user'
+                            ? 'bg-[#0F172A] text-white'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {msg.role === 'user' ? msg.content : renderAiMessage(msg.content)}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1579,10 +1617,7 @@ export default function TikTokAnalyzerPage() {
                   ].map(q => (
                     <button
                       key={q}
-                      onClick={() => {
-                        setAiQuestion(q);
-                        handleAiChat(q);
-                      }}
+                      onClick={() => { if (!aiUserName) { alert('이름을 먼저 선택해주세요'); return; } setAiQuestion(q); handleAiChat(q); }}
                       className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border rounded-lg text-xs text-gray-700 transition"
                     >
                       {q}
@@ -1595,30 +1630,42 @@ export default function TikTokAnalyzerPage() {
               <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 mt-4">
                 <p className="text-xs font-semibold text-blue-600 mb-2">💬 AI에게 질문하기</p>
                 <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim()) handleAiChat(aiQuestion); }}
-                  placeholder="무엇이든 질문하세요... (예: centella와 skin1004 영상 크리에이터 비교해줘)"
-                  className="flex-1 px-4 py-3 border-2 border-blue-300 bg-white rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  disabled={aiLoading}
-                />
-                <button
-                  onClick={() => aiQuestion.trim() && handleAiChat(aiQuestion)}
-                  disabled={aiLoading || !aiQuestion.trim()}
-                  className="px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
-                >
-                  {aiLoading ? '분석 중...' : '🚀 전송'}
-                </button>
-                {aiMessages.length > 0 && (
-                  <button
-                    onClick={startNewAiChat}
-                    className="px-3 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
+                  <select
+                    value={aiUserName}
+                    onChange={(e) => setAiUserName(e.target.value)}
+                    className="px-3 py-3 border-2 border-blue-300 bg-white rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={aiLoading}
                   >
-                    새 대화
+                    <option value="">이름 선택</option>
+                    {USER_NAME_OPTIONS.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={aiQuestion}
+                    onChange={(e) => setAiQuestion(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && aiQuestion.trim() && aiUserName) handleAiChat(); }}
+                    placeholder="무엇이든 질문하세요... (예: centella와 skin1004 영상 크리에이터 비교해줘)"
+                    className="flex-1 px-4 py-3 border-2 border-blue-300 bg-white rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={aiLoading}
+                  />
+                  <button
+                    onClick={() => aiQuestion.trim() && aiUserName && handleAiChat()}
+                    disabled={aiLoading || !aiQuestion.trim() || !aiUserName}
+                    className="px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                    title={!aiUserName ? '이름을 선택해주세요' : ''}
+                  >
+                    {aiLoading ? '분석 중...' : '🚀 전송'}
                   </button>
-                )}
+                  {aiMessages.length > 0 && (
+                    <button
+                      onClick={startNewAiChat}
+                      className="px-3 py-3 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
+                    >
+                      새 대화
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
