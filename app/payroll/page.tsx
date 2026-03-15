@@ -4,6 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 
 // ============ API ============
 const API_URL = process.env.NEXT_PUBLIC_PAYROLL_API_URL || '';
+const API_KEY = process.env.NEXT_PUBLIC_API_SECRET_KEY || '';
+const PAYROLL_PASSWORD = process.env.NEXT_PUBLIC_PAYROLL_PASSWORD || '';
+
+function apiHeaders(json = true): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (json) h['Content-Type'] = 'application/json';
+  if (API_KEY) h['x-api-key'] = API_KEY;
+  return h;
+}
 
 // ============ 타입 ============
 interface Employee {
@@ -134,7 +143,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
 async function apiCalculate(yearMonth: string, paymentDate?: string) {
   const res = await fetch(`${API_URL}/api/payroll/calculate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders(),
     body: JSON.stringify({ yearMonth, paymentDate }),
   });
   if (!res.ok) throw new Error(`계산 실패: ${res.status}`);
@@ -142,27 +151,27 @@ async function apiCalculate(yearMonth: string, paymentDate?: string) {
 }
 
 async function apiGetPayroll(yearMonth: string) {
-  const res = await fetch(`${API_URL}/api/payroll/${yearMonth}`);
+  const res = await fetch(`${API_URL}/api/payroll/${yearMonth}`, { headers: apiHeaders(false) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`조회 실패: ${res.status}`);
   return res.json();
 }
 
 async function apiGetDetails(yearMonth: string) {
-  const res = await fetch(`${API_URL}/api/payroll/${yearMonth}/details`);
+  const res = await fetch(`${API_URL}/api/payroll/${yearMonth}/details`, { headers: apiHeaders(false) });
   if (res.status === 404) return [];
   if (!res.ok) throw new Error(`상세 조회 실패: ${res.status}`);
   return res.json();
 }
 
 async function apiConfirm(payrollId: number) {
-  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/confirm`, { method: 'PUT' });
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/confirm`, { method: 'PUT', headers: apiHeaders(false) });
   if (!res.ok) throw new Error(`확정 실패: ${res.status}`);
   return res.json();
 }
 
 async function apiCreateVoucher(payrollId: number): Promise<VoucherResponse> {
-  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/voucher`, { method: 'POST' });
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/voucher`, { method: 'POST', headers: apiHeaders(false) });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || `전표 생성 실패: ${res.status}`);
@@ -171,14 +180,14 @@ async function apiCreateVoucher(payrollId: number): Promise<VoucherResponse> {
 }
 
 async function apiGetVoucher(payrollId: number): Promise<VoucherResponse | null> {
-  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/voucher`);
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/voucher`, { headers: apiHeaders(false) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`전표 조회 실패: ${res.status}`);
   return res.json();
 }
 
 async function apiDownloadBankExcel(payrollId: number) {
-  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/bank-excel`);
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/bank-excel`, { headers: apiHeaders(false) });
   if (!res.ok) throw new Error(`엑셀 다운로드 실패: ${res.status}`);
   const blob = await res.blob();
   const disposition = res.headers.get('content-disposition');
@@ -194,7 +203,7 @@ async function apiDownloadBankExcel(payrollId: number) {
 async function apiNotify(payrollId: number, type: string) {
   const res = await fetch(`${API_URL}/api/payroll/${payrollId}/notify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders(),
     body: JSON.stringify({ type }),
   });
   if (!res.ok) throw new Error(`알림 전송 실패: ${res.status}`);
@@ -202,19 +211,19 @@ async function apiNotify(payrollId: number, type: string) {
 }
 
 async function apiGetLogs(payrollId: number) {
-  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/logs`);
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/logs`, { headers: apiHeaders(false) });
   if (!res.ok) return [];
   return res.json();
 }
 
 async function apiGetEmployees() {
-  const res = await fetch(`${API_URL}/api/employees`);
+  const res = await fetch(`${API_URL}/api/employees`, { headers: apiHeaders(false) });
   if (!res.ok) throw new Error(`직원 조회 실패: ${res.status}`);
   return res.json();
 }
 
 async function apiGetRates(year: number) {
-  const res = await fetch(`${API_URL}/api/rates/${year}`);
+  const res = await fetch(`${API_URL}/api/rates/${year}`, { headers: apiHeaders(false) });
   if (!res.ok) return null;
   return res.json();
 }
@@ -258,6 +267,29 @@ function StatusBadge({ status }: { status: string }) {
 
 // ============ 메인 컴포넌트 ============
 export default function PayrollPage() {
+  // 비밀번호 인증
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+
+  // 세션 복원
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('payroll_auth');
+      if (saved === 'true') setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    if (passwordInput === PAYROLL_PASSWORD && PAYROLL_PASSWORD) {
+      setIsAuthenticated(true);
+      setPasswordError(false);
+      sessionStorage.setItem('payroll_auth', 'true');
+    } else {
+      setPasswordError(true);
+    }
+  };
+
   const [tab, setTab] = useState<TabType>('payroll');
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -508,6 +540,52 @@ export default function PayrollPage() {
   }, {} as Record<string, number>);
 
   // ============ 렌더링 ============
+
+  // 비밀번호 입력 화면
+  if (!isAuthenticated) {
+    return (
+      <>
+        <style jsx global>{`
+          @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+          * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+        `}</style>
+        <div className="min-h-screen bg-[#0B0D11] flex items-center justify-center">
+          <div className="w-full max-w-sm mx-4">
+            <div className="bg-[#13151B] border border-white/[0.06] rounded-2xl p-8 shadow-2xl">
+              <div className="flex justify-center mb-6">
+                <div className="w-14 h-14 bg-gradient-to-br from-[#1E9EDE] to-[#1476A6] rounded-xl flex items-center justify-center shadow-lg shadow-[#1E9EDE]/20">
+                  <span className="text-white text-xl font-bold">P</span>
+                </div>
+              </div>
+              <h1 className="text-lg font-bold text-white text-center mb-1">급여 관리</h1>
+              <p className="text-xs text-slate-500 text-center mb-6">접속하려면 비밀번호를 입력하세요</p>
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={e => { setPasswordInput(e.target.value); setPasswordError(false); }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleLogin(); }}
+                  placeholder="비밀번호"
+                  autoFocus
+                  className="w-full bg-[#0B0D11] border border-white/[0.06] rounded-lg px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-[#1E9EDE]/50"
+                />
+                {passwordError && (
+                  <p className="text-xs text-red-400">비밀번호가 올바르지 않습니다.</p>
+                )}
+                <button
+                  onClick={handleLogin}
+                  className="w-full bg-[#1E9EDE] hover:bg-[#1a8bc7] text-white py-3 rounded-lg text-sm font-semibold transition-all active:scale-95"
+                >
+                  접속
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style jsx global>{`
