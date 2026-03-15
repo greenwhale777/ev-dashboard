@@ -8,19 +8,28 @@ const API_URL = process.env.NEXT_PUBLIC_PAYROLL_API_URL || '';
 // ============ 타입 ============
 interface Employee {
   id: number;
+  employee_code: string;
   name: string;
-  department: string;
   position: string;
+  department: string | null;
+  is_ceo: boolean;
   base_salary: number;
   meal_allowance: number;
   car_allowance: number;
   childcare_allowance: number;
-  join_date: string;
+  dependents: number;
+  bank_name: string | null;
+  bank_account: string | null;
+  phone: string | null;
+  is_active: boolean;
 }
 
 interface PayrollRow {
   employee_id: number;
+  employee_code?: string;
   name: string;
+  position?: string;
+  is_ceo?: boolean;
   base_salary: number;
   meal_allowance: number;
   car_allowance: number;
@@ -36,15 +45,25 @@ interface PayrollRow {
   net_pay: number;
 }
 
-interface VoucherRow {
-  type: '차변' | '대변';
+interface VoucherLine {
+  line_no: number;
+  division: string;
   account_code: string;
   account_name: string;
-  vendor_code: string;
-  vendor_name: string;
+  partner_code: string;
+  partner_name: string;
   debit: number;
   credit: number;
   description: string;
+}
+
+interface VoucherResponse {
+  lines: VoucherLine[];
+  summary: {
+    total_debit: number;
+    total_credit: number;
+    balanced: boolean;
+  };
 }
 
 interface ProcessingStep {
@@ -55,6 +74,7 @@ interface ProcessingStep {
 }
 
 interface LogEntry {
+  id?: number;
   timestamp: string;
   step: string;
   status: 'info' | 'success' | 'error' | 'warning';
@@ -63,22 +83,25 @@ interface LogEntry {
 
 interface InsuranceRates {
   year: number;
-  national_pension: number;
-  health_insurance: number;
-  long_term_care: number;
-  employment_insurance: number;
+  national_pension: string;
+  health_insurance: string;
+  long_term_care: string;
+  employment_worker: string;
+  employment_employer: string;
+  employment_stability: string;
+  industrial_accident: string;
 }
 
 type TabType = 'payroll' | 'employees' | 'logs';
-type PayrollStatus = 'draft' | 'confirmed' | 'voucher_uploaded' | 'bank_exported' | 'completed';
+type PayrollStatus = 'draft' | 'confirmed' | 'voucher_created' | 'completed';
 
 // ============ 상수 ============
 const PAYROLL_COLUMNS = [
   { key: 'name', label: '성명', editable: false },
-  { key: 'base_salary', label: '기본급', editable: true },
-  { key: 'meal_allowance', label: '식대', editable: true },
-  { key: 'car_allowance', label: '차량유지비', editable: true },
-  { key: 'childcare_allowance', label: '보육수당', editable: true },
+  { key: 'base_salary', label: '기본급', editable: false },
+  { key: 'meal_allowance', label: '식대', editable: false },
+  { key: 'car_allowance', label: '차량유지비', editable: false },
+  { key: 'childcare_allowance', label: '보육수당', editable: false },
   { key: 'gross_pay', label: '지급총액', editable: false },
   { key: 'income_tax', label: '소득세', editable: false },
   { key: 'local_income_tax', label: '지방소득세', editable: false },
@@ -92,9 +115,11 @@ const PAYROLL_COLUMNS = [
 
 const STEP_LABELS: Record<string, string> = {
   calculate: '계산',
+  confirm: '확정',
   compare: '비교',
   voucher: '전표',
   bank_excel: '은행엑셀',
+  notify: '알림',
   clearing: '반제',
 };
 
@@ -105,6 +130,95 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
   error: { label: '오류', bg: 'bg-red-900/30', text: 'text-red-400', dot: 'bg-red-400' },
 };
 
+// ============ API 함수 ============
+async function apiCalculate(yearMonth: string, paymentDate?: string) {
+  const res = await fetch(`${API_URL}/api/payroll/calculate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ yearMonth, paymentDate }),
+  });
+  if (!res.ok) throw new Error(`계산 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiGetPayroll(yearMonth: string) {
+  const res = await fetch(`${API_URL}/api/payroll/${yearMonth}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`조회 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiGetDetails(yearMonth: string) {
+  const res = await fetch(`${API_URL}/api/payroll/${yearMonth}/details`);
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`상세 조회 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiConfirm(payrollId: number) {
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/confirm`, { method: 'PUT' });
+  if (!res.ok) throw new Error(`확정 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiCreateVoucher(payrollId: number): Promise<VoucherResponse> {
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/voucher`, { method: 'POST' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `전표 생성 실패: ${res.status}`);
+  }
+  return res.json();
+}
+
+async function apiGetVoucher(payrollId: number): Promise<VoucherResponse | null> {
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/voucher`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`전표 조회 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiDownloadBankExcel(payrollId: number) {
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/bank-excel`);
+  if (!res.ok) throw new Error(`엑셀 다운로드 실패: ${res.status}`);
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition');
+  const filename = disposition?.split("''")[1] || '급여이체.xls';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = decodeURIComponent(filename);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function apiNotify(payrollId: number, type: string) {
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type }),
+  });
+  if (!res.ok) throw new Error(`알림 전송 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiGetLogs(payrollId: number) {
+  const res = await fetch(`${API_URL}/api/payroll/${payrollId}/logs`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+async function apiGetEmployees() {
+  const res = await fetch(`${API_URL}/api/employees`);
+  if (!res.ok) throw new Error(`직원 조회 실패: ${res.status}`);
+  return res.json();
+}
+
+async function apiGetRates(year: number) {
+  const res = await fetch(`${API_URL}/api/rates/${year}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 // ============ 유틸리티 ============
 function formatNumber(n: number): string {
   return n.toLocaleString('ko-KR');
@@ -113,6 +227,7 @@ function formatNumber(n: number): string {
 function formatTime(iso: string | undefined) {
   if (!iso) return '-';
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
   const m = d.getMonth() + 1;
   const day = d.getDate();
   const h = d.getHours().toString().padStart(2, '0');
@@ -141,79 +256,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ============ 기본 데이터 (API 연결 전 데모용) ============
-const DEFAULT_RATES: InsuranceRates = {
-  year: 2026,
-  national_pension: 4.5,
-  health_insurance: 3.545,
-  long_term_care: 12.95,
-  employment_insurance: 0.9,
-};
-
-const DEFAULT_EMPLOYEES: Employee[] = [
-  { id: 1, name: '홍길동', department: '경영지원', position: '대리', base_salary: 3000000, meal_allowance: 200000, car_allowance: 200000, childcare_allowance: 100000, join_date: '2020-03-02' },
-  { id: 2, name: '김철수', department: '마케팅', position: '사원', base_salary: 2500000, meal_allowance: 200000, car_allowance: 0, childcare_allowance: 0, join_date: '2022-09-01' },
-  { id: 3, name: '이영희', department: '개발', position: '과장', base_salary: 3500000, meal_allowance: 200000, car_allowance: 200000, childcare_allowance: 200000, join_date: '2019-01-15' },
-  { id: 4, name: '박민수', department: '디자인', position: '사원', base_salary: 2800000, meal_allowance: 200000, car_allowance: 0, childcare_allowance: 0, join_date: '2023-06-01' },
-];
-
-function calculatePayroll(employees: Employee[], rates: InsuranceRates): PayrollRow[] {
-  return employees.map(emp => {
-    const gross = emp.base_salary + emp.meal_allowance + emp.car_allowance + emp.childcare_allowance;
-    // 비과세 제외 과세대상: 식대 20만 비과세, 차량유지비 20만 비과세, 보육수당 10만 비과세
-    const taxableBase = emp.base_salary;
-    const nationalPension = Math.round(taxableBase * rates.national_pension / 100);
-    const healthInsurance = Math.round(taxableBase * rates.health_insurance / 100);
-    const longTermCare = Math.round(healthInsurance * rates.long_term_care / 100);
-    const employmentInsurance = Math.round(taxableBase * rates.employment_insurance / 100);
-    // 간이세액표 간략 적용 (실제는 국세청 간이세액표 참조)
-    const incomeTax = Math.round(taxableBase * 0.03);
-    const localIncomeTax = Math.round(incomeTax * 0.1);
-    const totalDeductions = incomeTax + localIncomeTax + nationalPension + healthInsurance + longTermCare + employmentInsurance;
-    return {
-      employee_id: emp.id,
-      name: emp.name,
-      base_salary: emp.base_salary,
-      meal_allowance: emp.meal_allowance,
-      car_allowance: emp.car_allowance,
-      childcare_allowance: emp.childcare_allowance,
-      gross_pay: gross,
-      income_tax: incomeTax,
-      local_income_tax: localIncomeTax,
-      national_pension: nationalPension,
-      health_insurance: healthInsurance,
-      long_term_care: longTermCare,
-      employment_insurance: employmentInsurance,
-      total_deductions: totalDeductions,
-      net_pay: gross - totalDeductions,
-    };
-  });
-}
-
-function generateVoucher(rows: PayrollRow[]): VoucherRow[] {
-  const totals = rows.reduce((acc, r) => ({
-    gross: acc.gross + r.gross_pay,
-    incomeTax: acc.incomeTax + r.income_tax,
-    localIncomeTax: acc.localIncomeTax + r.local_income_tax,
-    nationalPension: acc.nationalPension + r.national_pension,
-    healthInsurance: acc.healthInsurance + r.health_insurance,
-    longTermCare: acc.longTermCare + r.long_term_care,
-    employmentInsurance: acc.employmentInsurance + r.employment_insurance,
-    netPay: acc.netPay + r.net_pay,
-  }), { gross: 0, incomeTax: 0, localIncomeTax: 0, nationalPension: 0, healthInsurance: 0, longTermCare: 0, employmentInsurance: 0, netPay: 0 });
-
-  return [
-    { type: '차변', account_code: '52100', account_name: '급여', vendor_code: '', vendor_name: '', debit: totals.gross, credit: 0, description: '급여 지급' },
-    { type: '대변', account_code: '25300', account_name: '예수금-소득세', vendor_code: 'TAX01', vendor_name: '세무서', debit: 0, credit: totals.incomeTax, description: '소득세 원천징수' },
-    { type: '대변', account_code: '25301', account_name: '예수금-지방소득세', vendor_code: 'TAX02', vendor_name: '지자체', debit: 0, credit: totals.localIncomeTax, description: '지방소득세 원천징수' },
-    { type: '대변', account_code: '25310', account_name: '예수금-국민연금', vendor_code: 'INS01', vendor_name: '국민연금공단', debit: 0, credit: totals.nationalPension, description: '국민연금 원천공제' },
-    { type: '대변', account_code: '25320', account_name: '예수금-건강보험', vendor_code: 'INS02', vendor_name: '건강보험공단', debit: 0, credit: totals.healthInsurance, description: '건강보험 원천공제' },
-    { type: '대변', account_code: '25321', account_name: '예수금-장기요양', vendor_code: 'INS02', vendor_name: '건강보험공단', debit: 0, credit: totals.longTermCare, description: '장기요양보험 원천공제' },
-    { type: '대변', account_code: '25330', account_name: '예수금-고용보험', vendor_code: 'INS03', vendor_name: '근로복지공단', debit: 0, credit: totals.employmentInsurance, description: '고용보험 원천공제' },
-    { type: '대변', account_code: '11010', account_name: '보통예금', vendor_code: 'BNK01', vendor_name: '기업은행', debit: 0, credit: totals.netPay, description: '급여 이체' },
-  ];
-}
-
 // ============ 메인 컴포넌트 ============
 export default function PayrollPage() {
   const [tab, setTab] = useState<TabType>('payroll');
@@ -221,12 +263,14 @@ export default function PayrollPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [payrollId, setPayrollId] = useState<number | null>(null);
   const [payrollStatus, setPayrollStatus] = useState<PayrollStatus>('draft');
-  const [employees, setEmployees] = useState<Employee[]>(DEFAULT_EMPLOYEES);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [payrollRows, setPayrollRows] = useState<PayrollRow[]>([]);
-  const [rates, setRates] = useState<InsuranceRates>(DEFAULT_RATES);
+  const [rates, setRates] = useState<InsuranceRates | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [apiConnected, setApiConnected] = useState(true);
 
   // 진행 상태
   const [steps, setSteps] = useState<ProcessingStep[]>([
@@ -239,7 +283,7 @@ export default function PayrollPage() {
 
   // 전표 모달
   const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [voucherRows, setVoucherRows] = useState<VoucherRow[]>([]);
+  const [voucherData, setVoucherData] = useState<VoucherResponse | null>(null);
 
   // 로그
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -248,178 +292,212 @@ export default function PayrollPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editRates, setEditRates] = useState(false);
 
-  // 인라인 편집
-  const [editingCell, setEditingCell] = useState<{ rowIdx: number; col: string } | null>(null);
-  const [editValue, setEditValue] = useState('');
+  // ============ API 연결 확인 ============
+  useEffect(() => {
+    if (!API_URL) {
+      setApiConnected(false);
+      setApiError('API 서버가 설정되지 않았습니다. NEXT_PUBLIC_PAYROLL_API_URL 환경변수를 설정해 주세요.');
+      return;
+    }
+    fetch(`${API_URL}/health`)
+      .then(res => { if (res.ok) setApiConnected(true); else throw new Error(); })
+      .catch(() => {
+        setApiConnected(false);
+        setApiError('급여 API 서버에 연결할 수 없습니다.');
+      });
+  }, []);
 
   // ============ 데이터 로드 ============
   const fetchPayrollData = useCallback(async () => {
-    if (!API_URL) {
-      // API 미설정 시 로컬 계산
-      const rows = calculatePayroll(employees, rates);
-      setPayrollRows(rows);
-      return;
-    }
+    if (!API_URL || !apiConnected) return;
     try {
       setLoading(true);
       setApiError(null);
-      const res = await fetch(`${API_URL}/api/payroll/${selectedMonth}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.rows) setPayrollRows(data.rows);
-        if (data.status) setPayrollStatus(data.status);
-        if (data.steps) setSteps(data.steps);
-        if (data.employees) setEmployees(data.employees);
+
+      const payroll = await apiGetPayroll(selectedMonth);
+      if (payroll) {
+        setPayrollId(payroll.id);
+        setPayrollStatus(payroll.status);
+        const details = await apiGetDetails(selectedMonth);
+        setPayrollRows(details);
+
+        // 상태에 따라 step 업데이트
+        const newSteps = [...steps];
+        if (payroll.status !== 'draft' || details.length > 0) {
+          newSteps[0] = { ...newSteps[0], status: 'done' };
+        }
+        if (payroll.status === 'confirmed' || payroll.status === 'voucher_created' || payroll.status === 'completed') {
+          newSteps[1] = { ...newSteps[1], status: 'done' };
+        }
+        if (payroll.status === 'voucher_created' || payroll.status === 'completed') {
+          newSteps[2] = { ...newSteps[2], status: 'done' };
+        }
+        setSteps(newSteps);
+
+        // 로그 로드
+        const serverLogs = await apiGetLogs(payroll.id);
+        if (Array.isArray(serverLogs) && serverLogs.length > 0) {
+          setLogs(serverLogs.map((l: any) => ({
+            id: l.id,
+            timestamp: l.created_at,
+            step: l.step,
+            status: l.status === 'success' ? 'success' : l.status === 'error' ? 'error' : 'info',
+            message: l.message,
+          })));
+        }
       } else {
-        // 데이터 없으면 로컬 계산
-        const rows = calculatePayroll(employees, rates);
-        setPayrollRows(rows);
+        setPayrollId(null);
+        setPayrollStatus('draft');
+        setPayrollRows([]);
+        setSteps(steps.map(s => ({ ...s, status: 'pending' })));
       }
     } catch (e) {
-      console.error('API 오류:', e);
-      setApiError('급여 API 서버에 연결할 수 없습니다. 로컬 데이터를 사용합니다.');
-      const rows = calculatePayroll(employees, rates);
-      setPayrollRows(rows);
+      console.error('데이터 로드 실패:', e);
+      setApiError('데이터를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, employees, rates]);
+  }, [selectedMonth, apiConnected]);
 
   useEffect(() => {
     fetchPayrollData();
   }, [fetchPayrollData]);
 
+  // 직원 목록 로드
+  useEffect(() => {
+    if (!API_URL || !apiConnected) return;
+    apiGetEmployees().then(setEmployees).catch(() => {});
+    const year = parseInt(selectedMonth.split('-')[0], 10);
+    apiGetRates(year).then(r => { if (r) setRates(r); }).catch(() => {});
+  }, [apiConnected, selectedMonth]);
+
   // ============ 액션 핸들러 ============
-  const handleCalculate = async () => {
-    addLog('calculate', 'info', '급여 계산을 시작합니다...');
-    setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'running' } : s));
-
-    if (API_URL) {
-      try {
-        const res = await fetch(`${API_URL}/api/payroll/${selectedMonth}/calculate`, { method: 'POST' });
-        const data = await res.json();
-        if (data.rows) setPayrollRows(data.rows);
-        setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'done' } : s));
-        addLog('calculate', 'success', `${data.rows?.length || 0}명 급여 계산 완료`);
-      } catch {
-        setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'error' } : s));
-        addLog('calculate', 'error', 'API 오류: 로컬에서 계산합니다.');
-        const rows = calculatePayroll(employees, rates);
-        setPayrollRows(rows);
-        setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'done' } : s));
-        addLog('calculate', 'success', `${rows.length}명 급여 계산 완료 (로컬)`);
-      }
-    } else {
-      await new Promise(r => setTimeout(r, 500));
-      const rows = calculatePayroll(employees, rates);
-      setPayrollRows(rows);
-      setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'done' } : s));
-      addLog('calculate', 'success', `${rows.length}명 급여 계산 완료`);
-    }
-    setPayrollStatus('draft');
-  };
-
-  const handleConfirm = () => {
-    setPayrollStatus('confirmed');
-    setSteps(prev => prev.map(s => s.key === 'compare' ? { ...s, status: 'done' } : s));
-    addLog('compare', 'success', '급여 확정 완료');
-  };
-
-  const handlePreviewVoucher = () => {
-    const voucher = generateVoucher(payrollRows);
-    setVoucherRows(voucher);
-    setShowVoucherModal(true);
-  };
-
-  const handleUploadVoucher = async () => {
-    setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'running' } : s));
-    addLog('voucher', 'info', '전표 업로드 중...');
-    if (API_URL) {
-      try {
-        await fetch(`${API_URL}/api/payroll/${selectedMonth}/voucher`, { method: 'POST' });
-        setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'done' } : s));
-        addLog('voucher', 'success', '전표 업로드 완료');
-        setPayrollStatus('voucher_uploaded');
-      } catch {
-        setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'error' } : s));
-        addLog('voucher', 'error', '전표 업로드 실패');
-      }
-    } else {
-      await new Promise(r => setTimeout(r, 800));
-      setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'done' } : s));
-      addLog('voucher', 'success', '전표 업로드 완료 (시뮬레이션)');
-      setPayrollStatus('voucher_uploaded');
-    }
-  };
-
-  const handleDownloadBankExcel = () => {
-    setSteps(prev => prev.map(s => s.key === 'bank_excel' ? { ...s, status: 'done' } : s));
-    addLog('bank_excel', 'success', '은행 엑셀 다운로드 완료');
-    setPayrollStatus('bank_exported');
-    // 실제로는 API에서 파일을 받아 다운로드
-    const csvContent = '수취인명,계좌번호,금액\n' + payrollRows.map(r => `${r.name},,${r.net_pay}`).join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `급여이체_${selectedMonth}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleTelegramNotify = async () => {
-    addLog('clearing', 'info', '텔레그램 알림 전송 중...');
-    if (API_URL) {
-      try {
-        await fetch(`${API_URL}/api/payroll/${selectedMonth}/notify`, { method: 'POST' });
-        addLog('clearing', 'success', '텔레그램 알림 전송 완료');
-      } catch {
-        addLog('clearing', 'error', '텔레그램 알림 전송 실패');
-      }
-    } else {
-      await new Promise(r => setTimeout(r, 500));
-      addLog('clearing', 'success', '텔레그램 알림 전송 완료 (시뮬레이션)');
-    }
-    setSteps(prev => prev.map(s => s.key === 'clearing' ? { ...s, status: 'done' } : s));
-    setPayrollStatus('completed');
-  };
-
-  // 인라인 편집
-  const startEdit = (rowIdx: number, col: string, value: number) => {
-    if (payrollStatus !== 'draft') return;
-    setEditingCell({ rowIdx, col });
-    setEditValue(String(value));
-  };
-
-  const saveEdit = () => {
-    if (!editingCell) return;
-    const { rowIdx, col } = editingCell;
-    const val = parseInt(editValue.replace(/,/g, ''), 10);
-    if (isNaN(val)) { setEditingCell(null); return; }
-
-    const updated = [...employees];
-    const emp = { ...updated[rowIdx] };
-    (emp as Record<string, unknown>)[col] = val;
-    updated[rowIdx] = emp;
-    setEmployees(updated);
-    setPayrollRows(calculatePayroll(updated, rates));
-    setEditingCell(null);
-  };
-
-  // 로그 추가
   const addLog = (step: string, status: LogEntry['status'], message: string) => {
     setLogs(prev => [{ timestamp: new Date().toISOString(), step, status, message }, ...prev]);
   };
 
-  // 직원 편집 저장
-  const saveEmployee = () => {
-    if (!editingEmployee) return;
-    setEmployees(prev => prev.map(e => e.id === editingEmployee.id ? editingEmployee : e));
-    setPayrollRows(calculatePayroll(
-      employees.map(e => e.id === editingEmployee.id ? editingEmployee : e),
-      rates
-    ));
-    setEditingEmployee(null);
+  const handleCalculate = async () => {
+    if (!apiConnected) return;
+    addLog('calculate', 'info', '급여 계산을 시작합니다...');
+    setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'running' } : s));
+    setLoading(true);
+
+    try {
+      const data = await apiCalculate(selectedMonth);
+      setPayrollId(data.payroll.id);
+      setPayrollStatus(data.payroll.status);
+
+      // details 배열에서 PayrollRow 변환
+      if (data.details) {
+        setPayrollRows(data.details.map((d: any) => ({
+          employee_id: d.employee_id || 0,
+          employee_code: d.employee_code,
+          name: d.name,
+          base_salary: d.base_salary,
+          meal_allowance: d.meal_allowance,
+          car_allowance: d.car_allowance,
+          childcare_allowance: d.childcare_allowance,
+          gross_pay: d.gross_pay,
+          income_tax: d.income_tax,
+          local_income_tax: d.local_income_tax,
+          national_pension: d.national_pension,
+          health_insurance: d.health_insurance,
+          long_term_care: d.long_term_care,
+          employment_insurance: d.employment_insurance,
+          total_deductions: d.total_deductions,
+          net_pay: d.net_pay,
+        })));
+      }
+
+      setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'done' } : s));
+      addLog('calculate', 'success', `${data.details?.length || 0}명 급여 계산 완료`);
+    } catch (e) {
+      setSteps(prev => prev.map(s => s.key === 'calculate' ? { ...s, status: 'error' } : s));
+      addLog('calculate', 'error', `급여 계산 실패: ${e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!apiConnected || !payrollId) return;
+    try {
+      setLoading(true);
+      await apiConfirm(payrollId);
+      setPayrollStatus('confirmed');
+      setSteps(prev => prev.map(s => s.key === 'compare' ? { ...s, status: 'done' } : s));
+      addLog('confirm', 'success', '급여 확정 완료');
+    } catch (e) {
+      addLog('confirm', 'error', `급여 확정 실패: ${e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreviewVoucher = async () => {
+    if (!apiConnected || !payrollId) return;
+    try {
+      // 먼저 기존 전표 조회 시도
+      let data = await apiGetVoucher(payrollId);
+      if (!data && payrollStatus === 'confirmed') {
+        // 없으면 생성
+        data = await apiCreateVoucher(payrollId);
+        setPayrollStatus('voucher_created');
+        setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'done' } : s));
+        addLog('voucher', 'success', '전표 12행 생성 완료');
+      }
+      if (data) {
+        setVoucherData(data);
+        setShowVoucherModal(true);
+      }
+    } catch (e) {
+      addLog('voucher', 'error', `전표 조회/생성 실패: ${e}`);
+    }
+  };
+
+  const handleCreateVoucher = async () => {
+    if (!apiConnected || !payrollId || payrollStatus !== 'confirmed') return;
+    setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'running' } : s));
+    addLog('voucher', 'info', '전표 생성 중...');
+    try {
+      const data = await apiCreateVoucher(payrollId);
+      setVoucherData(data);
+      setPayrollStatus('voucher_created');
+      setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'done' } : s));
+      addLog('voucher', 'success', `전표 12행 생성 완료. 차변=${formatNumber(data.summary.total_debit)}, 대변=${formatNumber(data.summary.total_credit)}`);
+    } catch (e) {
+      setSteps(prev => prev.map(s => s.key === 'voucher' ? { ...s, status: 'error' } : s));
+      addLog('voucher', 'error', `전표 생성 실패: ${e}`);
+    }
+  };
+
+  const handleDownloadBankExcel = async () => {
+    if (!apiConnected || !payrollId) return;
+    try {
+      setSteps(prev => prev.map(s => s.key === 'bank_excel' ? { ...s, status: 'running' } : s));
+      addLog('bank_excel', 'info', '은행 엑셀 생성 중...');
+      await apiDownloadBankExcel(payrollId);
+      setSteps(prev => prev.map(s => s.key === 'bank_excel' ? { ...s, status: 'done' } : s));
+      addLog('bank_excel', 'success', '하나은행 엑셀 다운로드 완료');
+    } catch (e) {
+      setSteps(prev => prev.map(s => s.key === 'bank_excel' ? { ...s, status: 'error' } : s));
+      addLog('bank_excel', 'error', `엑셀 다운로드 실패: ${e}`);
+    }
+  };
+
+  const handleTelegramNotify = async (type: 'calculate' | 'bank_excel') => {
+    if (!apiConnected || !payrollId) return;
+    addLog('notify', 'info', `텔레그램 알림 전송 중 (${type})...`);
+    try {
+      const result = await apiNotify(payrollId, type);
+      if (result.success) {
+        addLog('notify', 'success', `텔레그램 알림 전송 완료 (${type})`);
+      } else {
+        addLog('notify', 'warning', '텔레그램 알림 전송 실패 (봇 토큰 확인 필요)');
+      }
+    } catch (e) {
+      addLog('notify', 'error', `텔레그램 알림 전송 실패: ${e}`);
+    }
   };
 
   // 합계 계산
@@ -519,7 +597,7 @@ export default function PayrollPage() {
                   </select>
                   <button
                     onClick={handleCalculate}
-                    disabled={loading}
+                    disabled={loading || !apiConnected}
                     className="bg-[#1E9EDE] hover:bg-[#1a8bc7] text-white px-5 py-2 rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
                   >
                     {loading ? '계산 중...' : '급여 계산'}
@@ -534,8 +612,7 @@ export default function PayrollPage() {
                   }`}>
                     {payrollStatus === 'draft' ? '초안' :
                      payrollStatus === 'confirmed' ? '확정' :
-                     payrollStatus === 'voucher_uploaded' ? '전표 업로드됨' :
-                     payrollStatus === 'bank_exported' ? '은행 엑셀 완료' :
+                     payrollStatus === 'voucher_created' ? '전표 생성됨' :
                      '처리 완료'}
                   </span>
                 </div>
@@ -599,40 +676,19 @@ export default function PayrollPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {payrollRows.map((row, rowIdx) => (
-                        <tr key={row.employee_id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      {payrollRows.map((row) => (
+                        <tr key={row.employee_id || row.name} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
                           {PAYROLL_COLUMNS.map(col => {
                             const val = row[col.key as keyof PayrollRow];
-                            const isEditing = editingCell?.rowIdx === rowIdx && editingCell?.col === col.key;
-                            const isEditableNow = col.editable && payrollStatus === 'draft';
 
                             if (col.key === 'name') {
                               return <td key={col.key} className="px-3 py-3 font-medium text-slate-200 whitespace-nowrap sticky left-0 bg-[#13151B] z-10">{val}</td>;
                             }
 
-                            if (isEditing) {
-                              return (
-                                <td key={col.key} className="px-1 py-1 text-right">
-                                  <input
-                                    type="text"
-                                    value={editValue}
-                                    onChange={e => setEditValue(e.target.value)}
-                                    onBlur={saveEdit}
-                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingCell(null); }}
-                                    autoFocus
-                                    className="w-24 bg-[#1E9EDE]/10 border border-[#1E9EDE]/30 rounded px-2 py-1 text-right text-sm text-white focus:outline-none"
-                                  />
-                                </td>
-                              );
-                            }
-
                             return (
                               <td
                                 key={col.key}
-                                onClick={() => isEditableNow && startEdit(rowIdx, col.key, val as number)}
                                 className={`px-3 py-3 text-right font-mono text-xs whitespace-nowrap ${
-                                  isEditableNow ? 'cursor-pointer hover:bg-[#1E9EDE]/5' : ''
-                                } ${
                                   col.key === 'gross_pay' ? 'text-white font-semibold' :
                                   col.key === 'net_pay' ? 'text-emerald-400 font-semibold' :
                                   col.key === 'total_deductions' ? 'text-red-400' :
@@ -670,35 +726,35 @@ export default function PayrollPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={handleConfirm}
-                  disabled={payrollRows.length === 0 || payrollStatus !== 'draft'}
+                  disabled={payrollRows.length === 0 || payrollStatus !== 'draft' || !apiConnected}
                   className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95"
                 >
                   급여 확정
                 </button>
                 <button
                   onClick={handlePreviewVoucher}
-                  disabled={payrollRows.length === 0}
+                  disabled={payrollRows.length === 0 || !apiConnected}
                   className="bg-[#13151B] border border-white/[0.06] hover:border-[#1E9EDE]/30 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200 px-5 py-2.5 rounded-lg text-sm font-medium transition-all active:scale-95"
                 >
                   전표 미리보기
                 </button>
                 <button
-                  onClick={handleUploadVoucher}
-                  disabled={payrollStatus !== 'confirmed'}
+                  onClick={handleCreateVoucher}
+                  disabled={payrollStatus !== 'confirmed' || !apiConnected}
                   className="bg-[#13151B] border border-white/[0.06] hover:border-[#1E9EDE]/30 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200 px-5 py-2.5 rounded-lg text-sm font-medium transition-all active:scale-95"
                 >
-                  전표 업로드
+                  전표 생성
                 </button>
                 <button
                   onClick={handleDownloadBankExcel}
-                  disabled={payrollStatus !== 'confirmed' && payrollStatus !== 'voucher_uploaded'}
+                  disabled={!payrollId || (payrollStatus !== 'confirmed' && payrollStatus !== 'voucher_created') || !apiConnected}
                   className="bg-[#13151B] border border-white/[0.06] hover:border-[#1E9EDE]/30 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200 px-5 py-2.5 rounded-lg text-sm font-medium transition-all active:scale-95"
                 >
                   은행 엑셀 다운로드
                 </button>
                 <button
-                  onClick={handleTelegramNotify}
-                  disabled={payrollStatus !== 'bank_exported' && payrollStatus !== 'voucher_uploaded'}
+                  onClick={() => handleTelegramNotify('calculate')}
+                  disabled={payrollRows.length === 0 || !apiConnected}
                   className="bg-[#13151B] border border-white/[0.06] hover:border-[#1E9EDE]/30 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200 px-5 py-2.5 rounded-lg text-sm font-medium transition-all active:scale-95"
                 >
                   텔레그램 알림
@@ -720,35 +776,37 @@ export default function PayrollPage() {
                 </button>
               </div>
 
-              {editRates ? (
+              {!apiConnected ? (
+                <div className="bg-[#13151B] border border-white/[0.06] rounded-xl p-12 text-center">
+                  <p className="text-slate-500 text-sm">API 서버에 연결되지 않았습니다.</p>
+                </div>
+              ) : editRates ? (
                 /* 보험 요율 설정 */
                 <div className="bg-[#13151B] border border-white/[0.06] rounded-xl p-6 max-w-lg">
-                  <h3 className="text-sm font-bold text-white mb-4">{rates.year}년 보험 요율 (근로자 부담분)</h3>
-                  <div className="space-y-4">
-                    {([
-                      ['national_pension', '국민연금'],
-                      ['health_insurance', '건강보험'],
-                      ['long_term_care', '장기요양보험 (건강보험 대비)'],
-                      ['employment_insurance', '고용보험'],
-                    ] as [keyof InsuranceRates, string][]).map(([key, label]) => (
-                      <div key={key} className="flex items-center justify-between gap-4">
-                        <label className="text-sm text-slate-400">{label}</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={rates[key]}
-                            onChange={e => setRates({ ...rates, [key]: parseFloat(e.target.value) || 0 })}
-                            className="w-24 bg-[#0B0D11] border border-white/[0.06] rounded px-3 py-1.5 text-right text-sm text-white focus:outline-none focus:border-[#1E9EDE]/50"
-                          />
-                          <span className="text-xs text-slate-500">%</span>
+                  <h3 className="text-sm font-bold text-white mb-4">{rates?.year || new Date().getFullYear()}년 보험 요율</h3>
+                  {rates ? (
+                    <div className="space-y-3">
+                      {([
+                        ['national_pension', '국민연금 (근로자)', rates.national_pension],
+                        ['health_insurance', '건강보험 (근로자)', rates.health_insurance],
+                        ['long_term_care', '장기요양보험 (건강보험 대비)', rates.long_term_care],
+                        ['employment_worker', '고용보험 (근로자)', rates.employment_worker],
+                        ['employment_employer', '고용보험 (사업자)', rates.employment_employer],
+                        ['employment_stability', '고용안정부담금', rates.employment_stability],
+                        ['industrial_accident', '산재보험', rates.industrial_accident],
+                      ] as [string, string, string][]).map(([, label, value]) => (
+                        <div key={label} className="flex items-center justify-between gap-4">
+                          <label className="text-sm text-slate-400">{label}</label>
+                          <span className="text-sm font-mono text-white">{(parseFloat(value) * 100).toFixed(2)}%</span>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">요율 데이터를 불러오는 중...</p>
+                  )}
                 </div>
               ) : (
-                /* 직원 목록 + 편집 */
+                /* 직원 목록 */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {employees.map(emp => (
                     <div
@@ -762,11 +820,10 @@ export default function PayrollPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-bold text-white">{emp.name}</span>
                             <div className="flex gap-2">
-                              <button onClick={saveEmployee} className="text-xs bg-[#1E9EDE] text-white px-3 py-1 rounded-md hover:bg-[#1a8bc7]">저장</button>
-                              <button onClick={() => setEditingEmployee(null)} className="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-md hover:bg-slate-700">취소</button>
+                              <button onClick={() => setEditingEmployee(null)} className="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-md hover:bg-slate-700">닫기</button>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-3 text-xs">
                             {([
                               ['base_salary', '기본급'],
                               ['meal_allowance', '식대'],
@@ -775,14 +832,15 @@ export default function PayrollPage() {
                             ] as [keyof Employee, string][]).map(([key, label]) => (
                               <div key={key}>
                                 <label className="text-xs text-slate-500 mb-1 block">{label}</label>
-                                <input
-                                  type="number"
-                                  value={editingEmployee[key] as number}
-                                  onChange={e => setEditingEmployee({ ...editingEmployee, [key]: parseInt(e.target.value) || 0 })}
-                                  className="w-full bg-[#0B0D11] border border-white/[0.06] rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#1E9EDE]/50"
-                                />
+                                <span className="text-sm font-mono text-white">{formatNumber(editingEmployee[key] as number)}</span>
                               </div>
                             ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-white/[0.04]">
+                            <div><span className="text-slate-500">은행</span><span className="text-slate-300 ml-2">{emp.bank_name || '-'}</span></div>
+                            <div><span className="text-slate-500">계좌</span><span className="text-slate-300 ml-2 font-mono">{emp.bank_account || '-'}</span></div>
+                            <div><span className="text-slate-500">전화</span><span className="text-slate-300 ml-2 font-mono">{emp.phone || '-'}</span></div>
+                            <div><span className="text-slate-500">가족수</span><span className="text-slate-300 ml-2">{emp.dependents}명</span></div>
                           </div>
                         </div>
                       ) : (
@@ -790,13 +848,13 @@ export default function PayrollPage() {
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <span className="text-sm font-bold text-white">{emp.name}</span>
-                              <span className="text-xs text-slate-500 ml-2">{emp.department} · {emp.position}</span>
+                              <span className="text-xs text-slate-500 ml-2">{emp.employee_code} · {emp.position}{emp.is_ceo ? ' (대표이사)' : ''}</span>
                             </div>
                             <button
                               onClick={() => setEditingEmployee({ ...emp })}
                               className="text-xs text-slate-400 hover:text-[#1E9EDE] transition-colors"
                             >
-                              편집
+                              상세
                             </button>
                           </div>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
@@ -806,13 +864,18 @@ export default function PayrollPage() {
                             <div className="flex justify-between"><span className="text-slate-500">보육수당</span><span className="text-slate-300 font-mono">{formatNumber(emp.childcare_allowance)}</span></div>
                           </div>
                           <div className="mt-3 pt-3 border-t border-white/[0.04] flex justify-between text-xs">
-                            <span className="text-slate-500">입사일</span>
-                            <span className="text-slate-400">{emp.join_date}</span>
+                            <span className="text-slate-500">은행</span>
+                            <span className="text-slate-400">{emp.bank_name || '-'} {emp.bank_account || ''}</span>
                           </div>
                         </div>
                       )}
                     </div>
                   ))}
+                  {employees.length === 0 && (
+                    <div className="col-span-2 bg-[#13151B] border border-white/[0.06] rounded-xl p-12 text-center">
+                      <p className="text-slate-500 text-sm">직원 데이터를 불러오는 중...</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -869,12 +932,12 @@ export default function PayrollPage() {
           )}
         </main>
 
-        {/* ===== 전표 미리보기 모달 ===== */}
-        {showVoucherModal && (
+        {/* ===== 전표 미리보기 모달 (실제 12행) ===== */}
+        {showVoucherModal && voucherData && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowVoucherModal(false)}>
-            <div className="bg-[#13151B] border border-white/[0.06] rounded-2xl w-full max-w-4xl mx-4 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#13151B] border border-white/[0.06] rounded-2xl w-full max-w-5xl mx-4 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
               <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white">전표 미리보기 — {selectedMonth}</h3>
+                <h3 className="text-sm font-bold text-white">전표 미리보기 — {selectedMonth} ({voucherData.lines.length}행)</h3>
                 <button onClick={() => setShowVoucherModal(false)} className="text-slate-400 hover:text-white transition-colors">
                   <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -883,19 +946,22 @@ export default function PayrollPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06]">
-                      {['구분', '계정코드', '계정명', '거래처코드', '거래처명', '차변', '대변', '적요'].map(h => (
-                        <th key={h} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 text-left whitespace-nowrap">{h}</th>
+                      {['행', '구분', '계정코드', '계정명', '거래처코드', '거래처명', '차변', '대변', '적요'].map(h => (
+                        <th key={h} className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap ${
+                          h === '차변' || h === '대변' ? 'text-right' : 'text-left'
+                        }`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {voucherRows.map((v, i) => (
-                      <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
-                        <td className={`px-3 py-2.5 text-xs font-semibold ${v.type === '차변' ? 'text-blue-400' : 'text-rose-400'}`}>{v.type}</td>
+                    {voucherData.lines.map((v) => (
+                      <tr key={v.line_no} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                        <td className="px-3 py-2.5 text-xs font-mono text-slate-500">{v.line_no}</td>
+                        <td className={`px-3 py-2.5 text-xs font-semibold ${v.division === '3차' ? 'text-blue-400' : 'text-rose-400'}`}>{v.division}</td>
                         <td className="px-3 py-2.5 text-xs font-mono text-slate-400">{v.account_code}</td>
                         <td className="px-3 py-2.5 text-xs text-slate-300">{v.account_name}</td>
-                        <td className="px-3 py-2.5 text-xs font-mono text-slate-500">{v.vendor_code || '-'}</td>
-                        <td className="px-3 py-2.5 text-xs text-slate-400">{v.vendor_name || '-'}</td>
+                        <td className="px-3 py-2.5 text-xs font-mono text-slate-500">{v.partner_code}</td>
+                        <td className="px-3 py-2.5 text-xs text-slate-400">{v.partner_name}</td>
                         <td className="px-3 py-2.5 text-xs font-mono text-right text-blue-400">{v.debit ? formatNumber(v.debit) : ''}</td>
                         <td className="px-3 py-2.5 text-xs font-mono text-right text-rose-400">{v.credit ? formatNumber(v.credit) : ''}</td>
                         <td className="px-3 py-2.5 text-xs text-slate-500">{v.description}</td>
@@ -904,21 +970,21 @@ export default function PayrollPage() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-white/[0.03] font-semibold">
-                      <td colSpan={5} className="px-3 py-3 text-xs text-slate-400 text-right">합계</td>
+                      <td colSpan={6} className="px-3 py-3 text-xs text-slate-400 text-right">합계</td>
                       <td className="px-3 py-3 text-xs font-mono text-right text-blue-400">
-                        {formatNumber(voucherRows.reduce((s, v) => s + v.debit, 0))}
+                        {formatNumber(voucherData.summary.total_debit)}
                       </td>
                       <td className="px-3 py-3 text-xs font-mono text-right text-rose-400">
-                        {formatNumber(voucherRows.reduce((s, v) => s + v.credit, 0))}
+                        {formatNumber(voucherData.summary.total_credit)}
                       </td>
                       <td className="px-3 py-3">
-                        {voucherRows.reduce((s, v) => s + v.debit, 0) === voucherRows.reduce((s, v) => s + v.credit, 0) ? (
+                        {voucherData.summary.balanced ? (
                           <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            일치
+                            대차 일치
                           </span>
                         ) : (
-                          <span className="text-xs text-red-400 font-semibold">불일치</span>
+                          <span className="text-xs text-red-400 font-semibold">대차 불일치</span>
                         )}
                       </td>
                     </tr>

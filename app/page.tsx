@@ -5,6 +5,7 @@ import changelog from './changelog.json';
 
 const API_URL = process.env.NEXT_PUBLIC_EV0_API_URL || 'https://ev0-agent-production.up.railway.app';
 const TIKTOK_API_URL = process.env.NEXT_PUBLIC_TIKTOK_API_URL || 'https://ev2-tiktok-analyzer-production.up.railway.app';
+const PAYROLL_API_URL = process.env.NEXT_PUBLIC_PAYROLL_API_URL || '';
 
 interface ExecutionLog {
   botId: string;
@@ -51,10 +52,11 @@ const botConfigs = {
     bots: [
       { id: 'accounting', name: '회계전표 업로드', schedule: '매주 수요일 12:00', hasManualRun: true, link: '/ev3/accounting' },
       { id: 'cash-bot', name: '캐시 잔액 확인', schedule: '매일 08:00', hasManualRun: true },
-      { id: 'management-calendar', name: '관리 일정 알림', schedule: '매일 09:00 체크', hasManualRun: false, link: '/ev3/management-calendar' }
+      { id: 'management-calendar', name: '관리 일정 알림', schedule: '매일 09:00 체크', hasManualRun: false, link: '/ev3/management-calendar' },
+      { id: 'payroll', name: '급여 관리', schedule: '매월 급여일', hasManualRun: false, link: '/payroll' }
     ],
     description: '회계 및 재무 자동화',
-    botIds: ['accounting', 'cash-bot', 'management-calendar'],
+    botIds: ['accounting', 'cash-bot', 'management-calendar', 'payroll'],
   }
 };
 
@@ -140,6 +142,32 @@ export default function Dashboard() {
         }
       } catch (e) {
         console.warn('TikTok 로그 조회 실패 (CORS 또는 서버 오류):', e);
+      }
+
+      // 급여 봇 상태 가져오기
+      if (PAYROLL_API_URL) {
+        try {
+          const payrollHealthRes = await fetch(`${PAYROLL_API_URL}/health`);
+          if (payrollHealthRes.ok) {
+            // 최근 급여 이력 조회
+            let payrollMsg = '급여 데이터 없음';
+            try {
+              const historyRes = await fetch(`${PAYROLL_API_URL}/api/payroll/history`);
+              if (historyRes.ok) {
+                const history = await historyRes.json();
+                if (Array.isArray(history) && history.length > 0) {
+                  const latest = history[0];
+                  const [y, m] = latest.year_month.split('-');
+                  const statusLabel = latest.status === 'draft' ? '계산 완료' : latest.status === 'confirmed' ? '확정' : latest.status === 'voucher_created' ? '전표 생성' : '처리 완료';
+                  payrollMsg = `${y}년 ${parseInt(m)}월 급여 ${statusLabel}`;
+                }
+              }
+            } catch {}
+            setBotStatus(prev => ({ ...prev, payroll: { botId: 'payroll', botName: '급여 관리', status: 'SUCCESS', startTime: '', endTime: new Date().toISOString(), duration: '', message: payrollMsg } }));
+          }
+        } catch {
+          setBotStatus(prev => ({ ...prev, payroll: { botId: 'payroll', botName: '급여 관리', status: 'ERROR', startTime: '', endTime: '', duration: '', message: '서버 오프라인' } }));
+        }
       }
 
       const allLogs = sortLogsByTime([...logsData, ...tiktokLogs]);
